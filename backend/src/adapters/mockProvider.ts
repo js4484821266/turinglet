@@ -2,6 +2,7 @@ import type {
   ConversationSnapshot,
   LLMProviderAdapter,
   MessageRecord,
+  OutboundMessageInstruction,
   MultiMessagePlan,
   SilenceMeaning
 } from '@turinglet/shared';
@@ -34,6 +35,18 @@ function pickIntensityFromText(text: string): number {
   if (hardSignals.some((s) => text.includes(s))) return 8;
   if (moderateSignals.some((s) => text.includes(s))) return 6;
   return 3;
+}
+
+function buildBurst(lines: string[], startDelay = 500, stepDelay = 650): OutboundMessageInstruction[] {
+  return lines.map((content, index) => ({
+    content,
+    delayMs: startDelay + index * stepDelay,
+    presenceBeforeSend: index === lines.length - 1 ? 'waiting' : index % 2 === 0 ? 'organizing' : 'thinking'
+  }));
+}
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, n));
 }
 
 export class MockProvider implements LLMProviderAdapter {
@@ -104,62 +117,85 @@ export class MockProvider implements LLMProviderAdapter {
     const selectedEmpathy = chooseByText(text, empathyByTheme[theme]);
 
     if (intensity >= 7) {
+      const deepBurstCandidate = clamp(Math.floor(text.length / 28), 4, 12);
+      const longNarrative = text.length >= 160;
+      const linePool = [
+        selectedEmpathy,
+        chooseByText(text + 'h1', [
+          '지금은 해결보다, 무너지지 않게 붙잡는 게 우선일 수 있어요.',
+          '마음이 버겁다면 지금은 길게 설명하지 않아도 충분해요.'
+        ]),
+        chooseByText(text + 'h2', [
+          '내가 여기서 속도를 맞출게요. 급히 정리하려고 하지 않아도 됩니다.',
+          '당장 결론을 내지 않아도 괜찮아요. 천천히 안전한 순서로 가요.'
+        ]),
+        chooseByText(text + 'h3', [
+          '지금 제일 거슬리는 감각이 있으면 한 단어만 말해줘도 좋아요.',
+          '지금 가장 큰 부담 하나만 골라서 같이 들여다볼까요.'
+        ]),
+        chooseByText(text + 'h4', [
+          '숨을 크게 바꾸기 어렵다면, 어깨 힘만 아주 조금 내려도 충분해요.',
+          '지금 할 일은 잘하기가 아니라 버티기예요. 그걸로 충분해요.'
+        ]),
+        chooseByText(text + 'h5', [
+          '여기서는 내가 먼저 기다릴게요. 이어서 말하고 싶어질 때 알려줘요.',
+          '지금은 짧은 신호만 보내도 괜찮아요. 예: "여기" 또는 "잠깐".'
+        ])
+      ];
+
+      const targetCount = longNarrative ? deepBurstCandidate : 3;
+      const lines: string[] = [];
+      for (let i = 0; i < targetCount; i += 1) {
+        lines.push(linePool[i % linePool.length] ?? selectedEmpathy);
+      }
+
+      const messages = buildBurst(lines, 550, longNarrative ? 520 : 850);
       return {
-        sendCount: 2,
-        reason: 'High emotional load: empathy then reflective hold.',
+        sendCount: messages.length,
+        reason: longNarrative
+          ? 'High emotional load + long narrative: human-like chunked supportive burst.'
+          : 'High emotional load: empathy then holding space.',
         nextState: 'waiting_after_empathy',
-        messages: [
-          {
-            content: selectedEmpathy,
-            delayMs: 700,
-            presenceBeforeSend: 'thinking'
-          },
-          {
-            content: chooseByText(text + 'wait', [
-              '지금은 제가 먼저 잠깐 기다릴게요. 이어서 말하고 싶어질 때 그때 이어가요.',
-              '지금은 정리보다 버티기가 우선일 수 있어요. 준비되면 짧게 신호만 줘도 괜찮아요.'
-            ]),
-            delayMs: 2200,
-            presenceBeforeSend: 'waiting'
-          }
-        ]
+        messages
       };
     }
 
     if (text.trim().endsWith('?')) {
+      const questionLines = [
+        selectedEmpathy,
+        chooseByText(text + 'q', [
+          '답을 넓게 하기보다, 지금 제일 무거운 포인트 하나부터 짚어볼까요?',
+          '해결책을 많이 찾기보다, 지금 가장 버거운 한 장면부터 같이 보죠.'
+        ])
+      ];
+      const messages = buildBurst(questionLines, 600, 1100);
       return {
-        sendCount: 2,
+        sendCount: messages.length,
         reason: 'Question asked: empathy + one focused question.',
         nextState: 'reflective_pause',
-        messages: [
-          {
-            content: selectedEmpathy,
-            delayMs: 600,
-            presenceBeforeSend: 'organizing'
-          },
-          {
-            content: chooseByText(text + 'q', [
-              '답을 넓게 하기보다, 지금 제일 무거운 포인트 하나부터 짚어볼까요?',
-              '해결책을 많이 찾기보다, 지금 가장 버거운 한 장면부터 같이 보죠.'
-            ]),
-            delayMs: 1700,
-            presenceBeforeSend: 'thinking'
-          }
-        ]
+        messages
       };
     }
 
+    const baseCount = text.length >= 120 ? 3 : 1;
+    const baseLines = [
+      selectedEmpathy,
+      chooseByText(text + 'g1', [
+        '말을 이어가고 싶으면 계속 적어도 되고, 잠깐 멈춰도 괜찮아요.',
+        '내가 너무 빨리 결론 내리지 않도록, 한 단계씩 천천히 볼게요.'
+      ]),
+      chooseByText(text + 'g2', [
+        '지금은 큰 해답보다 작은 안정이 먼저일 수 있어요.',
+        '필요하면 이 대화를 아주 짧게 끊어서 이어가도 좋아요.'
+      ])
+    ].slice(0, baseCount);
+    const baseMessages = buildBurst(baseLines, 700, 900);
+
     return {
-      sendCount: 1,
+      sendCount: baseMessages.length,
       reason: 'Default gentle reflection.',
       nextState: 'reflective_pause',
-      messages: [
-        {
-          content: selectedEmpathy,
-          delayMs: 900,
-          presenceBeforeSend: 'thinking'
-        }
-      ]
+      messages: baseMessages
     };
   }
 

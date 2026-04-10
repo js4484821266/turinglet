@@ -46,7 +46,7 @@ export interface OutboundMessageInstruction {
 }
 
 export interface MultiMessagePlan {
-  sendCount: 0 | 1 | 2;
+  sendCount: number;
   reason: string;
   nextState: SessionMachineState;
   messages: OutboundMessageInstruction[];
