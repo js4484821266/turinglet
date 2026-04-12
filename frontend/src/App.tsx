@@ -272,7 +272,7 @@ function ChatPanel() {
         : assistantPresence === 'typing'
           ? '타이핑 중'
           : '잠시 기다리는 중';
-  const counterpartTyping = assistantPresence !== 'waiting';
+  const counterpartTyping = assistantPresence === 'typing';
 
   return (
     <div className="chat-shell card">
@@ -291,7 +291,7 @@ function ChatPanel() {
       </div>
 
       <div className="typing-row">내 입력 상태: {userTyping ? '입력 중' : '입력 없음'}</div>
-      <div className="typing-row">상대 입력 상태: {counterpartTyping ? '입력 중' : '입력 없음'}</div>
+      <div className="typing-row">상대 입력 상태: {counterpartTyping ? '입력 중' : assistantPresence === 'thinking' ? '생각 중' : assistantPresence === 'organizing' ? '정리 중' : '입력 없음'}</div>
 
       <div className="composer">
         <textarea

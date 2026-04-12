@@ -1,8 +1,15 @@
 import type { ConversationSnapshot, LLMProviderAdapter, MultiMessagePlan } from '@turinglet/shared';
 
+function isStandaloneUtterance(text: string): boolean {
+  return /^(안녕(하세요)?|안녕하세요|네|응|넵|예|고마워요?|감사(합니다)?|맞아요|맞아|오케이|알겠어요|알겠어)$/.test(
+    text
+  );
+}
+
 function likelyUserWillContinue(text: string): boolean {
   const t = text.trim();
   if (!t) return false;
+  if (isStandaloneUtterance(t)) return false;
   if (/(여기까지|다 말했|끝|이상이야)$/.test(t)) return false;
 
   const shortFragment = t.length <= 8;

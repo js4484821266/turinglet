@@ -13,19 +13,31 @@ function chooseByText(text: string, options: string[]): string {
   return options[seed % options.length] ?? '';
 }
 
+function isStandaloneUtterance(text: string): boolean {
+  return /^(안녕(하세요)?|안녕하세요|네|응|넵|예|고마워요?|감사(합니다)?|맞아요|맞아|오케이|알겠어요|알겠어)$/.test(
+    text
+  );
+}
+
+function isGreeting(text: string): boolean {
+  return /^(안녕|안녕하세요|반가워요|반갑습니다)/.test(text.trim());
+}
+
 function looksLikeContinuation(text: string): boolean {
   const t = text.trim();
   if (!t) return false;
+  if (isStandaloneUtterance(t)) return false;
   if (/(여기까지|다 말했|끝|이상이야)$/.test(t)) return false;
   const continuationEnding = /([,~…]|\.\.\.)$|(그리고|근데|근데요|또|그래서|그러다|아니|그러면)$/;
-  const shortFragment = t.length <= 8;
+  const shortFragment = t.length <= 6;
   const unfinishedMarker = /(아니|그리고|근데|잠깐|일단|음|어|뭔가)$/.test(t);
   const openClauseTail = /(하면|해서|인데|지만|거든|같아서|같은데|하려고|보니까)$/.test(t);
   return shortFragment || unfinishedMarker || openClauseTail || continuationEnding.test(t);
 }
 
-function detectTheme(text: string): 'anxiety' | 'fatigue' | 'lonely' | 'self_blame' | 'generic' {
+function detectTheme(text: string): 'anxiety' | 'fatigue' | 'focus' | 'lonely' | 'self_blame' | 'generic' {
   if (/(불안|초조|걱정|긴장|두려)/.test(text)) return 'anxiety';
+  if (/(집중|산만|멍하|흩어|손에 안 잡|집중이 안)/.test(text)) return 'focus';
   if (/(지침|지쳤|피곤|번아웃|기운|무기력)/.test(text)) return 'fatigue';
   if (/(외롭|혼자|고립|아무도)/.test(text)) return 'lonely';
   if (/(내 잘못|망했|부끄|자책|후회)/.test(text)) return 'self_blame';
@@ -95,6 +107,21 @@ export class MockProvider implements LLMProviderAdapter {
     }
 
     const text = input.userText ?? '';
+    if (isGreeting(text)) {
+      return {
+        sendCount: 1,
+        reason: 'Greeting detected: natural opening response.',
+        nextState: 'reflective_pause',
+        messages: [
+          {
+            content: '안녕하세요. 와줘서 고마워요. 지금 마음에서 제일 먼저 떠오르는 걸 편하게 말해줘도 돼요.',
+            delayMs: 450,
+            presenceBeforeSend: 'typing'
+          }
+        ]
+      };
+    }
+
     if (looksLikeContinuation(text)) {
       return {
         sendCount: 0,
@@ -119,6 +146,11 @@ export class MockProvider implements LLMProviderAdapter {
         '에너지가 바닥난 느낌이 전해져요. 여기서는 속도를 천천히 해도 괜찮아요.',
         `${focus}를 붙잡고 있었던 시간 자체가 길었을 수 있어요. 지금은 버티는 기준으로 볼게요.`
       ],
+      focus: [
+        `집중이 풀리는 느낌이 계속되면 ${focus} 자체가 더 버겁게 느껴질 수 있어요.`,
+        `${focus} 앞에서 머리가 자꾸 흩어지는 상태 같아요. 의지가 약해서라기보다 피로가 쌓였을 때 자주 그래요.`,
+        `${focus}에 바로 몰입이 안 되는 게 이상한 건 아니에요. 지금은 진입 장벽을 낮추는 쪽이 더 현실적이에요.`
+      ],
       lonely: [
         `혼자 버티는 느낌이 큰 것 같아요. ${focus} 같은 이야기는 더 꺼내기 어렵죠.`,
         '고립감이 느껴질 때는 작은 반응조차 큰 힘이 되기도 해요. 여기서는 혼자가 아니에요.',
@@ -130,9 +162,9 @@ export class MockProvider implements LLMProviderAdapter {
         `${focus}를 떠올릴수록 스스로를 몰아붙이게 되는 패턴이 보이네요. 지금은 강도를 낮춰볼게요.`
       ],
       generic: [
-        `지금 느끼는 무게를 그대로 말해줘서 고마워요. ${focus}는 급하게 결론내리지 않아도 돼요.`,
-        '말해주는 속도 자체가 이미 중요한 신호예요. 천천히 같이 살펴봐요.',
-        `${focus}를 다루는 방식은 정답이 하나가 아니에요. 지금 페이스를 우선할게요.`
+        `지금 느끼는 무게를 이렇게 바로 말해줘서 고마워요. ${focus}부터 차근히 볼게요.`,
+        `${focus} 때문에 머리가 복잡해진 상태로 들려요. 지금은 핵심 하나만 붙잡아도 충분해요.`,
+        `${focus}를 다루는 방식은 사람마다 달라요. 네 리듬에 맞춰서 이어가보자.`
       ]
     };
 
