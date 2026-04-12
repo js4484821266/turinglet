@@ -6,11 +6,12 @@ function likelyUserWillContinue(text: string): boolean {
   if (/(여기까지|다 말했|끝|이상이야)$/.test(t)) return false;
 
   const shortFragment = t.length <= 8;
-  const connectiveTail = /(그리고|근데|그래서|잠깐|일단|아니|그러면|또)$/.test(t);
-  const openClauseTail = /(하면|해서|인데|지만|거든|같아서|같은데|하려고|보니까)$/.test(t);
+  const connectiveTail = /(그리고|근데|그래서|잠깐|일단|아니|그러면|또|근데요|그리고요)$/.test(t);
+  const openClauseTail = /(하면|해서|인데|지만|거든|같아서|같은데|하려고|보니까|는데|고|죠|네요|더라|니까|길래|니까요|데요|던데|듯)$/.test(t);
   const trailingDots = /(\.\.\.|…)$/.test(t);
   const trailingCommaLike = /[,~]$/.test(t);
-  return shortFragment || connectiveTail || openClauseTail || trailingDots || trailingCommaLike;
+  const trailingVerbCue = /(하다|되다|가다|오다|들어가다|나가다|있다|없다|싶다|같다|느끼다|말하다|생각하다)$/.test(t);
+  return shortFragment || connectiveTail || openClauseTail || trailingDots || trailingCommaLike || trailingVerbCue;
 }
 
 export class ConversationOrchestrator {

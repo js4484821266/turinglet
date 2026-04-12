@@ -10,7 +10,7 @@ import { sha256 } from '../utils/security.js';
 export interface UserRecord {
   id: string;
   publicId: string;
-  displayName?: string;
+  displayName?: string | undefined;
 }
 
 export interface SessionRecord {
@@ -21,7 +21,7 @@ export interface SessionRecord {
 export interface Store {
   createUser(input: {
     publicId: string;
-    displayName?: string;
+    displayName?: string | undefined;
     recoveryCodeHash: string | null;
   }): Promise<UserRecord>;
   createIdentityToken(userId: string, token: string): Promise<void>;
@@ -35,7 +35,7 @@ export interface Store {
     sessionId: string;
     role: Role;
     content: string;
-    metadata?: Record<string, unknown>;
+    metadata?: Record<string, unknown> | undefined;
   }): Promise<MessageRecord>;
   listMessages(sessionId: string, limit: number): Promise<MessageRecord[]>;
   setTypingPresence(input: { sessionId: string; userId: string; isTyping: boolean }): Promise<void>;
@@ -50,8 +50,8 @@ export interface Store {
   upsertEmotionalSnapshot(input: { sessionId: string; intensity: number; summary: string }): Promise<void>;
   getConversationSnapshot(sessionId: string): Promise<ConversationSnapshot>;
   listActiveSessions(): Promise<SessionRecord[]>;
-  listUsers(): Promise<Array<{ id: string; publicId: string; displayName?: string; createdAt: number; sessionCount: number }>>;
-  listSessions(): Promise<Array<{ id: string; userId: string; active: boolean; createdAt: number; lastSeenAt: number; messageCount: number; lastMessageAt?: number; lastUserMessageAt?: number; lastAssistantMessageAt?: number }>>;
+  listUsers(): Promise<Array<{ id: string; publicId: string; displayName?: string | undefined; createdAt: number; sessionCount: number }>>;
+  listSessions(): Promise<Array<{ id: string; userId: string; active: boolean; createdAt: number; lastSeenAt: number; messageCount: number; lastMessageAt?: number | undefined; lastUserMessageAt?: number | undefined; lastAssistantMessageAt?: number | undefined }>>;
   listMessagesForSession(sessionId: string): Promise<MessageRecord[]>;
   listProactiveEvents(): Promise<Array<{ id: string; sessionId: string; decision: string; reason: string; createdAt: number }>>;
 }

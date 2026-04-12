@@ -25,14 +25,14 @@ export interface MessageRecord {
   content: string;
   eventType: 'append';
   createdAt: string;
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown> | undefined;
 }
 
 export interface ConversationSnapshot {
   sessionId: string;
-  lastUserMessageAt?: number;
-  lastAssistantMessageAt?: number;
-  lastMessageAt?: number;
+  lastUserMessageAt?: number | undefined;
+  lastAssistantMessageAt?: number | undefined;
+  lastMessageAt?: number | undefined;
   recentEmotionalIntensity: number;
   userTyping: boolean;
   state: SessionMachineState;
@@ -56,11 +56,11 @@ export interface LLMProviderAdapter {
   generateMessage(input: {
     snapshot: ConversationSnapshot;
     intent: 'empathy' | 'question' | 'reflection' | 'checkin';
-    userText?: string;
+    userText?: string | undefined;
   }): Promise<string>;
   generateMultiMessagePlan(input: {
     snapshot: ConversationSnapshot;
-    userText?: string;
+    userText?: string | undefined;
     silenceMeaning?: SilenceMeaning;
   }): Promise<MultiMessagePlan>;
   summarizeConversationState(input: {
@@ -76,7 +76,7 @@ export interface LLMProviderAdapter {
 export interface ProactiveDecisionInput {
   snapshot: ConversationSnapshot;
   now: number;
-  lastOutreachAt?: number;
+  lastOutreachAt?: number | undefined;
   minSilenceMs: number;
   cooldownMs: number;
 }

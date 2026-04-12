@@ -69,17 +69,19 @@ export class MockProvider implements LLMProviderAdapter {
     intent: 'empathy' | 'question' | 'reflection' | 'checkin';
     userText?: string;
   }): Promise<string> {
+    const text = input.userText?.trim() ?? '';
+    const focus = text ? extractFocus(text) : '지금 상황';
     switch (input.intent) {
       case 'empathy':
-        return '지금 답이 길지 않아도 괜찮아요. 감정이 크면 말이 잘 안 나오는 게 자연스러워요.';
+        return `${focus} 얘기 꺼내는 것만으로도 이미 많이 버틴 거예요. 지금은 길게 설명하지 않아도 돼요.`;
       case 'question':
-        return '지금 당장 해결보다, 오늘 버티는 데 가장 부담되는 한 가지를 같이 골라볼까요?';
+        return `${focus} 중에서 오늘 제일 마음을 잡아끄는 한 가지만 먼저 짚어볼까요?`;
       case 'reflection':
-        return '당장 결론을 내리지 않아도 돼요. 지금 느끼는 걸 안전하게 꺼내는 속도로 가볼게요.';
+        return `${focus}를 말하는 동안 속도가 조금 엇갈렸을 수 있어요. 그 페이스 그대로 받아볼게요.`;
       case 'checkin':
-        return '혹시 지금은 울거나 생각을 정리하느라 답이 늦을 수 있다고 느껴져요. 준비되면 한 단어만 남겨도 괜찮아요.';
+        return `지금은 ${focus}를 정리하느라 잠깐 멈춘 걸 수도 있어요. 준비되면 짧게 이어줘도 괜찮아요.`;
       default:
-        return '천천히 괜찮습니다.';
+        return `지금은 ${focus}부터 천천히 볼게요.`;
     }
   }
 
@@ -142,24 +144,24 @@ export class MockProvider implements LLMProviderAdapter {
       const linePool = [
         selectedEmpathy,
         chooseByText(text + 'h1', [
-          '지금은 해결보다, 무너지지 않게 붙잡는 게 우선일 수 있어요.',
-          '마음이 버겁다면 지금은 길게 설명하지 않아도 충분해요.'
+          '지금은 정리보다 버티는 쪽이 더 맞아 보여요.',
+          '길게 설명하지 않아도 흐름은 충분히 느껴져요.'
         ]),
         chooseByText(text + 'h2', [
-          '내가 여기서 속도를 맞출게요. 급히 정리하려고 하지 않아도 됩니다.',
-          '당장 결론을 내지 않아도 괜찮아요. 천천히 안전한 순서로 가요.'
+          '내가 너무 앞서가지 않게 속도를 맞출게요.',
+          '당장 결론을 붙이지 않아도 돼요. 지금은 맥락을 먼저 볼게요.'
         ]),
         chooseByText(text + 'h3', [
-          '지금 제일 거슬리는 감각이 있으면 한 단어만 말해줘도 좋아요.',
-          '지금 가장 큰 부담 하나만 골라서 같이 들여다볼까요.'
+          '지금 가장 걸리는 장면 하나만 집어줘도 충분해요.',
+          '제일 먼저 건드려진 부분부터 같이 보죠.'
         ]),
         chooseByText(text + 'h4', [
-          '숨을 크게 바꾸기 어렵다면, 어깨 힘만 아주 조금 내려도 충분해요.',
-          '지금 할 일은 잘하기가 아니라 버티기예요. 그걸로 충분해요.'
+          '숨을 크게 바꾸기 어렵다면, 그냥 멈춰 있는 상태여도 괜찮아요.',
+          '지금은 잘 정리하는 것보다 덜 흔들리는 쪽이 더 중요해 보여요.'
         ]),
         chooseByText(text + 'h5', [
-          '여기서는 내가 먼저 기다릴게요. 이어서 말하고 싶어질 때 알려줘요.',
-          '지금은 짧은 신호만 보내도 괜찮아요. 예: "여기" 또는 "잠깐".'
+          '내가 먼저 서두르지 않을게요. 이어서 말하고 싶으면 그때 붙이면 돼요.',
+          '짧게 이어도 되고, 잠깐 멈춰도 돼요. 흐름만 같이 잡아볼게요.'
         ])
       ];
 
@@ -202,11 +204,11 @@ export class MockProvider implements LLMProviderAdapter {
       selectedEmpathy,
       chooseByText(text + 'g1', [
         '말을 이어가고 싶으면 계속 적어도 되고, 잠깐 멈춰도 괜찮아요.',
-        '내가 너무 빨리 결론 내리지 않도록, 한 단계씩 천천히 볼게요.'
+        '내가 앞서 해석하지 않도록, 한 번에 하나씩 볼게요.'
       ]),
       chooseByText(text + 'g2', [
-        '지금은 큰 해답보다 작은 안정이 먼저일 수 있어요.',
-        '필요하면 이 대화를 아주 짧게 끊어서 이어가도 좋아요.'
+        '지금은 해답보다 상황을 정확히 듣는 쪽이 먼저예요.',
+        '필요하면 이 대화를 짧은 단위로 나눠서 이어가도 좋아요.'
       ])
     ].slice(0, baseCount);
     const baseMessages = buildBurst(baseLines, 700, 900);

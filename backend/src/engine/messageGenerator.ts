@@ -1,4 +1,4 @@
-import type { ConversationSnapshot, LLMProviderAdapter, SilenceMeaning } from '@turinglet/shared';
+import type { ConversationSnapshot, LLMProviderAdapter, MessageRecord, SilenceMeaning } from '@turinglet/shared';
 
 export class MessageGenerator {
   constructor(private readonly provider: LLMProviderAdapter) {}
@@ -17,7 +17,7 @@ export class MessageGenerator {
 
   async inferSilence(input: {
     snapshot: ConversationSnapshot;
-    recentMessages: Array<{ id: string; sessionId: string; role: 'user' | 'assistant' | 'system'; content: string; eventType: 'append'; createdAt: string; metadata?: Record<string, unknown> }>;
+    recentMessages: MessageRecord[];
   }): Promise<SilenceMeaning> {
     return this.provider.detectUserSilenceMeaning({
       snapshot: input.snapshot,

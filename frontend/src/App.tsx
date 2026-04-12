@@ -215,7 +215,7 @@ function ChatPanel() {
     }
     typingTimer.current = window.setTimeout(() => {
       void sendTyping(false);
-    }, 1500);
+    }, 4000);
   };
 
   const sendMessage = async () => {
