@@ -134,6 +134,24 @@ npm run migrate
 npm run dev
 ```
 
+백엔드만 실행하려면:
+
+```bash
+npm run dev:server
+```
+
+프론트만 실행하려면:
+
+```bash
+npm run dev:client
+```
+
+데스크톱 창(Electron)까지 같이 실행하려면:
+
+```bash
+npm run dev:desktop
+```
+
 ### 5. 테스트
 
 ```bash
@@ -147,13 +165,15 @@ npm run test
 ## 기술 스택
 
 ### Frontend
-- Electron
 - React
 - TypeScript
 - Vite
 - Zustand
 - socket.io-client
 - @zxing/browser
+
+### Desktop (선택)
+- Electron
 
 ### Backend
 - Node.js
@@ -174,7 +194,6 @@ npm run test
 
 ## 왜 이 스택을 썼는가
 
-- Electron: 로컬에서 바로 시연 가능한 데스크톱 형태가 필요해서
 - React: 메신저형 UI를 빠르게 만들기 쉬워서
 - TypeScript: 대화 상태와 정책 계약을 명확하게 유지하기 위해
 - SQLite: 설치 부담이 적고 로컬 데모에 적합해서
@@ -182,6 +201,7 @@ npm run test
 - Socket.IO: AI 상태와 메시지를 실시간으로 보여주기 위해
 - QR 라이브러리: 이메일/비밀번호 없이 로그인 흐름을 만들기 위해
 - Zustand: 복잡하지 않은 상태 관리를 위해
+- Electron(선택): 로컬 데스크톱 데모가 필요할 때만 켤 수 있도록 분리해서 운영 모드와 충돌을 줄이기 위해
 
 ## 정리
 

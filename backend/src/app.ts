@@ -61,6 +61,8 @@ export function createApp(): AppServices {
   app.use(createRateLimiter(config.rateLimitWindowMs, config.rateLimitMax));
 
   const sessionTimers = new Map<string, NodeJS.Timeout[]>();
+  const reactivePlanTimers = new Map<string, NodeJS.Timeout>();
+  const reactiveSequence = new Map<string, number>();
 
   const emitPresence = (sessionId: string, state: PresenceState): void => {
     io?.to(`session:${sessionId}`).emit('presence', { sessionId, state });
@@ -74,6 +76,14 @@ export function createApp(): AppServices {
     const timers = sessionTimers.get(sessionId) ?? [];
     timers.forEach(clearTimeout);
     sessionTimers.delete(sessionId);
+  };
+
+  const clearReactivePlanTimer = (sessionId: string): void => {
+    const timer = reactivePlanTimers.get(sessionId);
+    if (timer) {
+      clearTimeout(timer);
+      reactivePlanTimers.delete(sessionId);
+    }
   };
 
   const queuePlanMessages = (input: {
@@ -101,6 +111,87 @@ export function createApp(): AppServices {
     );
 
     sessionTimers.set(input.sessionId, timers);
+  };
+
+  const scheduleReactivePlan = (input: {
+    sessionId: string;
+    userText: string;
+    attempt?: number;
+    sequence?: number;
+    startedAt?: number;
+  }): void => {
+    const attempt = input.attempt ?? 0;
+    const sequence = input.sequence ?? (reactiveSequence.get(input.sessionId) ?? 0) + 1;
+    const startedAt = input.startedAt ?? Date.now();
+    reactiveSequence.set(input.sessionId, sequence);
+
+    clearReactivePlanTimer(input.sessionId);
+
+    const delay = attempt === 0 ? config.userContinuationGraceMs : 900;
+    const timer = setTimeout(async () => {
+      if (reactiveSequence.get(input.sessionId) !== sequence) {
+        return;
+      }
+
+      const typing = await store.isUserTyping(input.sessionId);
+      if (typing) {
+        if (attempt < 20) {
+          scheduleReactivePlan({
+            sessionId: input.sessionId,
+            userText: input.userText,
+            attempt: attempt + 1,
+            sequence,
+            startedAt
+          });
+        }
+        emitPresence(input.sessionId, 'waiting');
+        return;
+      }
+
+      emitPresence(input.sessionId, 'thinking');
+
+      const snapshot = await store.getConversationSnapshot(input.sessionId);
+      const plan = await orchestrator.planForUserMessage({
+        snapshot,
+        userText: input.userText
+      });
+
+      if (plan.sendCount === 0) {
+        const elapsed = Date.now() - startedAt;
+        const maxWait = config.reactiveResponseMaxWaitMs;
+        const holdForContinuation = /continuation|typing|defer/i.test(plan.reason);
+        if (holdForContinuation && elapsed < maxWait && attempt < 20) {
+          emitPresence(input.sessionId, 'organizing');
+          scheduleReactivePlan({
+            sessionId: input.sessionId,
+            userText: input.userText,
+            attempt: attempt + 1,
+            sequence,
+            startedAt
+          });
+          return;
+        }
+
+        const forcedPlan = await provider.generateMultiMessagePlan({
+          snapshot,
+          userText: input.userText
+        });
+        queuePlanMessages({
+          sessionId: input.sessionId,
+          messages: forcedPlan.messages,
+          source: 'reactive'
+        });
+        return;
+      }
+
+      queuePlanMessages({
+        sessionId: input.sessionId,
+        messages: plan.messages,
+        source: 'reactive'
+      });
+    }, delay);
+
+    reactivePlanTimers.set(input.sessionId, timer);
   };
 
   const auth = async (req: Request, res: Response): Promise<{ sessionId: string; userId: string } | undefined> => {
@@ -255,12 +346,6 @@ export function createApp(): AppServices {
       return;
     }
 
-    await store.setTypingPresence({
-      sessionId: identity.sessionId,
-      userId: identity.userId,
-      isTyping: false
-    });
-
     const userMessage = await store.appendMessage({
       sessionId: identity.sessionId,
       role: 'user',
@@ -280,19 +365,16 @@ export function createApp(): AppServices {
       summary: summary.summary
     });
 
-    const snapshot = await store.getConversationSnapshot(identity.sessionId);
-    const plan = await orchestrator.planForUserMessage({
-      snapshot,
+    scheduleReactivePlan({
+      sessionId: identity.sessionId,
       userText: parsed.data.content
     });
 
-    queuePlanMessages({
-      sessionId: identity.sessionId,
-      messages: plan.messages,
-      source: 'reactive'
+    res.status(202).json({
+      accepted: true,
+      planReason: 'deferred_reactive_planning',
+      sendCount: null
     });
-
-    res.status(202).json({ accepted: true, planReason: plan.reason, sendCount: plan.sendCount });
   });
 
   app.use((err: unknown, _req: Request, res: Response, _next: express.NextFunction) => {

@@ -3,10 +3,14 @@ import type { ConversationSnapshot, LLMProviderAdapter, MultiMessagePlan } from 
 function likelyUserWillContinue(text: string): boolean {
   const t = text.trim();
   if (!t) return false;
-  const shortUnfinished = t.length <= 22 && !/[.!?]$/.test(t);
-  const connectiveTail = /(그리고|근데|그래서|잠깐|일단|아니|그러면)$/.test(t);
+  if (/(여기까지|다 말했|끝|이상이야)$/.test(t)) return false;
+
+  const shortFragment = t.length <= 8;
+  const connectiveTail = /(그리고|근데|그래서|잠깐|일단|아니|그러면|또)$/.test(t);
+  const openClauseTail = /(하면|해서|인데|지만|거든|같아서|같은데|하려고|보니까)$/.test(t);
   const trailingDots = /(\.\.\.|…)$/.test(t);
-  return shortUnfinished || connectiveTail || trailingDots;
+  const trailingCommaLike = /[,~]$/.test(t);
+  return shortFragment || connectiveTail || openClauseTail || trailingDots || trailingCommaLike;
 }
 
 export class ConversationOrchestrator {

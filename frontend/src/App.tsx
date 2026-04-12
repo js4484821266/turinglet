@@ -234,7 +234,6 @@ function ChatPanel() {
 
     appendMessage(optimisticMessage);
     try {
-      await sendTyping(false);
       await api.post(
         '/chat/messages',
         { content },
@@ -273,6 +272,7 @@ function ChatPanel() {
         : assistantPresence === 'typing'
           ? '타이핑 중'
           : '잠시 기다리는 중';
+  const counterpartTyping = assistantPresence !== 'waiting';
 
   return (
     <div className="chat-shell card">
@@ -287,9 +287,11 @@ function ChatPanel() {
             <div className={`bubble ${m.role === 'user' ? 'mine' : 'theirs'}`}>{m.content}</div>
           </div>
         ))}
+        {counterpartTyping ? <div className="counterpart-typing">상대가 입력 중...</div> : null}
       </div>
 
-      <div className="typing-row">사용자 입력 상태: {userTyping ? '입력 중' : '입력 없음'}</div>
+      <div className="typing-row">내 입력 상태: {userTyping ? '입력 중' : '입력 없음'}</div>
+      <div className="typing-row">상대 입력 상태: {counterpartTyping ? '입력 중' : '입력 없음'}</div>
 
       <div className="composer">
         <textarea

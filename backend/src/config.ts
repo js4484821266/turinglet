@@ -21,5 +21,7 @@ export const config = {
   proactivePollMs: num('PROACTIVE_POLL_MS', 5000),
   proactiveMinSilenceMs: num('PROACTIVE_MIN_SILENCE_MS', 120000),
   proactiveCooldownMs: num('PROACTIVE_COOLDOWN_MS', 240000),
+  userContinuationGraceMs: num('USER_CONTINUATION_GRACE_MS', 1800),
+  reactiveResponseMaxWaitMs: num('REACTIVE_RESPONSE_MAX_WAIT_MS', 30000),
   mockProvider: process.env.MOCK_PROVIDER !== 'false'
 } as const;

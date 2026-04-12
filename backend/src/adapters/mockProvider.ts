@@ -8,17 +8,20 @@ import type {
 } from '@turinglet/shared';
 
 function chooseByText(text: string, options: string[]): string {
+  if (options.length === 0) return '';
   const seed = [...text].reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-  return options[seed % options.length] ?? options[0];
+  return options[seed % options.length] ?? '';
 }
 
 function looksLikeContinuation(text: string): boolean {
   const t = text.trim();
   if (!t) return false;
+  if (/(여기까지|다 말했|끝|이상이야)$/.test(t)) return false;
   const continuationEnding = /([,~…]|\.\.\.)$|(그리고|근데|근데요|또|그래서|그러다|아니|그러면)$/;
-  const shortFragment = t.length <= 22 && !/[.!?]$/.test(t);
-  const unfinishedMarker = /(아니|그리고|근데|잠깐|일단|음|어)/.test(t) && !/[.!?]$/.test(t);
-  return shortFragment || unfinishedMarker || continuationEnding.test(t);
+  const shortFragment = t.length <= 8;
+  const unfinishedMarker = /(아니|그리고|근데|잠깐|일단|음|어|뭔가)$/.test(t);
+  const openClauseTail = /(하면|해서|인데|지만|거든|같아서|같은데|하려고|보니까)$/.test(t);
+  return shortFragment || unfinishedMarker || openClauseTail || continuationEnding.test(t);
 }
 
 function detectTheme(text: string): 'anxiety' | 'fatigue' | 'lonely' | 'self_blame' | 'generic' {
@@ -47,6 +50,17 @@ function buildBurst(lines: string[], startDelay = 500, stepDelay = 650): Outboun
 
 function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
+}
+
+function extractFocus(text: string): string {
+  const tokens = text
+    .replace(/[.,!?~()"'`]/g, ' ')
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2);
+  const stop = new Set(['그냥', '진짜', '약간', '조금', '정말', '뭔가', '이거', '저거']);
+  const candidate = tokens.find((t) => !stop.has(t));
+  return candidate ?? '지금 상황';
 }
 
 export class MockProvider implements LLMProviderAdapter {
@@ -90,27 +104,33 @@ export class MockProvider implements LLMProviderAdapter {
 
     const intensity = pickIntensityFromText(text);
     const theme = detectTheme(text);
+    const focus = extractFocus(text);
 
     const empathyByTheme: Record<typeof theme, string[]> = {
       anxiety: [
-        '긴장이 계속 올라오는 상태처럼 들려요. 지금 몸이 먼저 놀라고 있는 걸 수도 있어요.',
-        '불안이 커지면 생각이 빨라져서 더 벅차지죠. 그 반응 자체는 아주 자연스러워요.'
+        `긴장이 계속 올라오는 상태처럼 들려요. ${focus} 때문에 몸이 먼저 놀라고 있을 수도 있어요.`,
+        `불안이 커지면 생각이 빨라져서 더 벅차지죠. ${focus}에서 그런 반응이 나오는 건 자연스러워요.`,
+        `${focus}를 다루는 동안 마음이 급해지는 게 느껴져요. 지금은 속도를 낮춰도 괜찮아요.`
       ],
       fatigue: [
-        '많이 지친 톤이 느껴져요. 지금은 잘하려는 힘보다 버티는 힘이 먼저 필요해 보여요.',
-        '에너지가 바닥난 느낌이 전해져요. 여기서는 속도를 천천히 해도 괜찮아요.'
+        `많이 지친 톤이 느껴져요. ${focus}를 견디는 데 에너지가 많이 빠진 것 같아요.`,
+        '에너지가 바닥난 느낌이 전해져요. 여기서는 속도를 천천히 해도 괜찮아요.',
+        `${focus}를 붙잡고 있었던 시간 자체가 길었을 수 있어요. 지금은 버티는 기준으로 볼게요.`
       ],
       lonely: [
-        '혼자 버티는 느낌이 큰 것 같아요. 그런 상태에서는 말 한 줄 꺼내는 것도 어렵죠.',
-        '고립감이 느껴질 때는 작은 반응조차 큰 힘이 되기도 해요. 여기서는 혼자가 아니에요.'
+        `혼자 버티는 느낌이 큰 것 같아요. ${focus} 같은 이야기는 더 꺼내기 어렵죠.`,
+        '고립감이 느껴질 때는 작은 반응조차 큰 힘이 되기도 해요. 여기서는 혼자가 아니에요.',
+        `${focus}를 혼자 감당하고 있었다면 지금 말 꺼낸 것만으로도 큰 변화예요.`
       ],
       self_blame: [
-        '자책이 크게 올라오는 상황처럼 들려요. 스스로를 몰아붙이는 마음이 많이 아팠을 것 같아요.',
-        '내 탓으로 묶고 싶은 마음이 보이는데, 지금은 판단보다 숨 돌리는 게 먼저일 수 있어요.'
+        `자책이 크게 올라오는 상황처럼 들려요. ${focus}를 전부 내 탓으로 묶고 싶어졌을 수 있어요.`,
+        '내 탓으로 묶고 싶은 마음이 보이는데, 지금은 판단보다 숨 돌리는 게 먼저일 수 있어요.',
+        `${focus}를 떠올릴수록 스스로를 몰아붙이게 되는 패턴이 보이네요. 지금은 강도를 낮춰볼게요.`
       ],
       generic: [
-        '지금 느끼는 무게를 그대로 말해줘서 고마워요. 여기서는 급하게 결론내리지 않아도 돼요.',
-        '말해주는 속도 자체가 이미 중요한 신호예요. 천천히 같이 살펴봐요.'
+        `지금 느끼는 무게를 그대로 말해줘서 고마워요. ${focus}는 급하게 결론내리지 않아도 돼요.`,
+        '말해주는 속도 자체가 이미 중요한 신호예요. 천천히 같이 살펴봐요.',
+        `${focus}를 다루는 방식은 정답이 하나가 아니에요. 지금 페이스를 우선할게요.`
       ]
     };
 

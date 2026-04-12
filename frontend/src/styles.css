@@ -247,6 +247,14 @@ tr.selected {
   color: #58646c;
 }
 
+.counterpart-typing {
+  margin-top: 2px;
+  margin-left: 4px;
+  font-size: 13px;
+  color: #5a7f70;
+  font-weight: 600;
+}
+
 .composer {
   border-top: 1px solid rgba(0, 0, 0, 0.08);
   padding: 12px;
