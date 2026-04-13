@@ -1,5 +1,6 @@
 import type { LLMProviderAdapter } from '@turinglet/shared';
 import { config } from '../config.js';
+import { HuggingFaceLocalProvider } from './hfLocalProvider.js';
 import { MockProvider } from './mockProvider.js';
 
 class PlaceholderExternalProvider implements LLMProviderAdapter {
@@ -18,5 +19,7 @@ class PlaceholderExternalProvider implements LLMProviderAdapter {
 }
 
 export function createProvider(): LLMProviderAdapter {
+  if (config.llmProvider === 'mock') return new MockProvider();
+  if (config.llmProvider === 'hf-local') return new HuggingFaceLocalProvider();
   return config.mockProvider ? new MockProvider() : new PlaceholderExternalProvider();
 }

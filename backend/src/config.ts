@@ -11,6 +11,12 @@ function num(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function providerMode(): 'mock' | 'hf-local' {
+  const mode = process.env.LLM_PROVIDER?.trim();
+  if (mode === 'hf-local' || mode === 'mock') return mode;
+  return process.env.MOCK_PROVIDER === 'false' ? 'hf-local' : 'mock';
+}
+
 export const config = {
   port: num('PORT', 4000),
   dbProvider: process.env.DB_PROVIDER === 'postgres' ? 'postgres' : 'sqlite',
@@ -23,5 +29,8 @@ export const config = {
   proactiveCooldownMs: num('PROACTIVE_COOLDOWN_MS', 240000),
   userContinuationGraceMs: num('USER_CONTINUATION_GRACE_MS', 1800),
   reactiveResponseMaxWaitMs: num('REACTIVE_RESPONSE_MAX_WAIT_MS', 30000),
-  mockProvider: process.env.MOCK_PROVIDER !== 'false'
+  mockProvider: process.env.MOCK_PROVIDER !== 'false',
+  llmProvider: providerMode(),
+  hfLocalUrl: process.env.HF_LOCAL_URL ?? 'http://127.0.0.1:8010',
+  hfLocalTimeoutMs: num('HF_LOCAL_TIMEOUT_MS', 40000)
 } as const;

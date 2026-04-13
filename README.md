@@ -122,6 +122,22 @@ npm install
 copy .env.example .env
 ```
 
+기본은 mock 규칙형입니다. 진짜 로컬 모델(Hugging Face)로 바꾸려면 `.env`에서 아래처럼 변경하세요.
+
+```bash
+LLM_PROVIDER=hf-local
+HF_LOCAL_URL=http://127.0.0.1:8010
+```
+
+API 키 없이 로컬 Hugging Face 서버 실행:
+
+```bash
+pip install -r local-llm/requirements.txt
+python local-llm/server.py
+```
+
+서버가 뜨면 백엔드가 자동으로 해당 로컬 모델을 호출합니다.
+
 ### 3. DB 초기화
 
 ```bash
