@@ -138,6 +138,49 @@ python local-llm/server.py
 
 서버가 뜨면 백엔드가 자동으로 해당 로컬 모델을 호출합니다.
 
+### 2-1. 진짜 AI 모드 체크리스트 (직접 해야 하는 것)
+
+- `.env`에서 아래 2줄이 반드시 설정되어 있어야 합니다.
+
+```bash
+LLM_PROVIDER=hf-local
+HF_LOCAL_URL=http://127.0.0.1:8010
+```
+
+- 로컬 LLM 서버를 먼저 실행해야 합니다.
+
+```bash
+npm run llm:server
+```
+
+- 로컬 LLM 서버가 살아있는지 확인합니다.
+
+```bash
+curl http://127.0.0.1:8010/health
+```
+
+PowerShell에서는:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8010/health
+```
+
+- 서버를 켠 뒤 `npm run dev`를 다시 실행해야 반영됩니다.
+
+### 2-2. 여전히 rule-based처럼 보일 때
+
+- `LLM_PROVIDER=mock` 또는 `MOCK_PROVIDER=true`로 실행 중인지 확인
+- `python local-llm/server.py`가 즉시 종료되면 패키지 설치/환경 오류 가능성 점검
+- `OMP: Error #15`가 나오면 새 가상환경에서 다시 설치
+
+```powershell
+python -m venv .venv-llm
+.\.venv-llm\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r local-llm/requirements.txt
+python local-llm/server.py
+```
+
 ### 3. DB 초기화
 
 ```bash

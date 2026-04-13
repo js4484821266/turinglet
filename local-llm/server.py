@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, Dict, List, Literal, Optional
+
+# Windows local run workaround for duplicated OpenMP runtimes loaded by ML deps.
+# Allows startup for local prototype environments where torch/numpy stacks collide.
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
 from fastapi import FastAPI
 from pydantic import BaseModel
 from transformers import pipeline
+import uvicorn
 
 
 TaskType = Literal["single_message", "multi_plan", "summary", "silence_meaning"]
@@ -27,13 +33,13 @@ app = FastAPI(title="Turinglet Local HF LLM")
 
 # CPU-only baseline model. Change via HF_MODEL env if needed.
 # Small model for local experimentation (quality is limited but non-rule-based).
-import os
 MODEL_NAME = os.getenv("HF_MODEL", "Qwen/Qwen2.5-0.5B-Instruct")
+HOST = os.getenv("HF_LOCAL_HOST", "127.0.0.1")
+PORT = int(os.getenv("HF_LOCAL_PORT", "8010"))
 
 text_gen = pipeline(
     "text-generation",
     model=MODEL_NAME,
-    device_map="auto",
 )
 
 
@@ -179,3 +185,7 @@ def generate(req: GenerateRequest) -> GenerateResponse:
 
     except Exception as exc:
         return GenerateResponse(ok=False, error=str(exc))
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host=HOST, port=PORT, reload=False)
