@@ -147,7 +147,6 @@ function ChatPanel() {
   const userTyping = useAppStore((s) => s.userTyping);
   const setMessages = useAppStore((s) => s.setMessages);
   const appendMessage = useAppStore((s) => s.appendMessage);
-  const removeMessageById = useAppStore((s) => s.removeMessageById);
   const setAssistantPresence = useAppStore((s) => s.setAssistantPresence);
   const setUserTyping = useAppStore((s) => s.setUserTyping);
 
@@ -223,16 +222,7 @@ function ChatPanel() {
     if (!content || isSending) return;
     setSendError(undefined);
     setIsSending(true);
-
-    const optimisticMessage: ChatMessage = {
-      id: `local-${Date.now()}`,
-      sessionId,
-      role: 'user',
-      content,
-      createdAt: new Date().toISOString()
-    };
-
-    appendMessage(optimisticMessage);
+    setDraft('');
     try {
       await api.post(
         '/chat/messages',
@@ -241,7 +231,6 @@ function ChatPanel() {
           headers: { 'x-session-id': sessionId }
         }
       );
-      setDraft('');
       void refreshMessages().catch(() => undefined);
     } catch (error: unknown) {
       let message = '전송 실패: 잠시 후 다시 시도해주세요.';
@@ -257,28 +246,25 @@ function ChatPanel() {
       }
       setSendError(message);
       setDraft(content);
-      removeMessageById(optimisticMessage.id);
       void refreshMessages().catch(() => undefined);
     } finally {
       setIsSending(false);
     }
   };
 
-  const statusText =
-    assistantPresence === 'thinking'
-      ? '생각 중'
-      : assistantPresence === 'organizing'
-        ? '정리 중'
-        : assistantPresence === 'typing'
-          ? '타이핑 중'
-          : '잠시 기다리는 중';
-  const counterpartTyping = assistantPresence === 'typing';
+  const threadStatusText =
+    assistantPresence === 'typing'
+      ? '상대가 답장을 작성 중입니다...'
+      : assistantPresence === 'thinking'
+        ? '상대가 내용을 생각 중입니다...'
+        : assistantPresence === 'organizing'
+          ? '상대가 답변을 정리 중입니다...'
+          : undefined;
 
   return (
     <div className="chat-shell card">
       <header className="chat-head">
         <h2>관계형 상담 챗 프로토타입</h2>
-        <span className="status">AI 상태: {statusText}</span>
       </header>
 
       <div className="messages">
@@ -287,11 +273,10 @@ function ChatPanel() {
             <div className={`bubble ${m.role === 'user' ? 'mine' : 'theirs'}`}>{m.content}</div>
           </div>
         ))}
-        {counterpartTyping ? <div className="counterpart-typing">상대가 입력 중...</div> : null}
+        {threadStatusText ? <div className="thread-status">{threadStatusText}</div> : null}
       </div>
 
       <div className="typing-row">내 입력 상태: {userTyping ? '입력 중' : '입력 없음'}</div>
-      <div className="typing-row">상대 입력 상태: {counterpartTyping ? '입력 중' : assistantPresence === 'thinking' ? '생각 중' : assistantPresence === 'organizing' ? '정리 중' : '입력 없음'}</div>
 
       <div className="composer">
         <textarea

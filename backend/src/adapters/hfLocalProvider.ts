@@ -35,6 +35,34 @@ function isSilenceMeaning(value: unknown): value is SilenceMeaning {
 export class HuggingFaceLocalProvider implements LLMProviderAdapter {
   private readonly fallback = new MockProvider();
 
+  private async aiSinglePlanFallback(input: {
+    snapshot: ConversationSnapshot;
+    userText?: string | undefined;
+  }): Promise<MultiMessagePlan | undefined> {
+    try {
+      const text = await this.generateMessage({
+        snapshot: input.snapshot,
+        intent: 'reflection',
+        userText: input.userText
+      });
+      if (!text.trim()) return undefined;
+      return {
+        sendCount: 1,
+        reason: 'hf single-message fallback plan',
+        nextState: 'reflective_pause',
+        messages: [
+          {
+            content: text,
+            delayMs: 550,
+            presenceBeforeSend: 'typing'
+          }
+        ]
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
   private async invoke(task: HFTask, payload: Record<string, unknown>): Promise<unknown> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.hfLocalTimeoutMs);
@@ -132,6 +160,12 @@ export class HuggingFaceLocalProvider implements LLMProviderAdapter {
     } catch {
       // fall through to mock provider
     }
+
+    const aiFallback = await this.aiSinglePlanFallback({
+      snapshot: input.snapshot,
+      userText: input.userText
+    });
+    if (aiFallback) return aiFallback;
 
     const fallbackInput: {
       snapshot: ConversationSnapshot;
