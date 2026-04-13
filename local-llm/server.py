@@ -43,14 +43,15 @@ text_gen = pipeline(
 )
 
 
-def _gen(prompt: str, max_new_tokens: int = 220, temperature: float = 0.7) -> str:
+def _gen(prompt: str, max_new_tokens: int = 100, temperature: float = 0.7) -> str:
+    """Generate text with reduced tokens for faster inference."""
     out = text_gen(
         prompt,
         max_new_tokens=max_new_tokens,
         do_sample=True,
         temperature=temperature,
-        top_p=0.92,
-        repetition_penalty=1.08,
+        top_p=0.9,
+        repetition_penalty=1.05,
     )
     if not out:
         return ""
@@ -78,29 +79,26 @@ def generate(req: GenerateRequest) -> GenerateResponse:
     try:
         if req.task == "single_message":
             intent = req.payload.get("intent", "reflection")
-            user_text = (req.payload.get("userText") or "").strip()
+            user_text = (req.payload.get("userText") or "").strip()[:200]  # Truncate for speed
             prompt = (
-                "너는 한국어 상담 대화 도우미다. 공감적이고 자연스럽게 1~2문장으로 답해라. "
-                "원칙 설명/교훈체를 피하고, 사용자의 실제 표현을 반영해라.\n"
-                f"의도: {intent}\n"
-                f"사용자: {user_text}\n"
-                "답변:"
+                "너는 따뜻하고 자연스러운 상담 도우미다.\n"
+                "1~2문장만. 공감 + 구체적 질문. 뻔한 말/교훈 금지.\n\n"
+                f"사용자: {user_text}\n대답:"
             )
-            return GenerateResponse(ok=True, result=_gen(prompt, max_new_tokens=120, temperature=0.8))
+            return GenerateResponse(ok=True, result=_gen(prompt, max_new_tokens=80, temperature=0.75))
 
         if req.task == "summary":
             messages = req.payload.get("recentMessages", [])
             latest_user = ""
             for m in reversed(messages):
                 if m.get("role") == "user":
-                    latest_user = m.get("content", "")
+                    latest_user = m.get("content", "")[:150]  # Truncate
                     break
             prompt = (
-                "다음 사용자 발화의 감정 강도(0~10 정수)와 한 줄 요약을 JSON으로만 출력하라.\n"
-                f"발화: {latest_user}\n"
-                '형식: {"emotionalIntensity": 0, "summary": "..."}'
+                "감정 강도(0~10)와 한 줄만. JSON: {\"emotionalIntensity\": N, \"summary\": \"...\"}\n"
+                f"발화: {latest_user}\n{{"
             )
-            data = _extract_json(_gen(prompt, max_new_tokens=100, temperature=0.2))
+            data = _extract_json("{" + _gen(prompt, max_new_tokens=60, temperature=0.1))
             return GenerateResponse(ok=True, result=data)
 
         if req.task == "silence_meaning":
@@ -128,19 +126,15 @@ def generate(req: GenerateRequest) -> GenerateResponse:
             return GenerateResponse(ok=True, result=value)
 
         # multi_plan
-        user_text = (req.payload.get("userText") or "").strip()
+        user_text =  - optimize for speed and clarity
+        user_text = (req.payload.get("userText") or "").strip()[:250]  # Truncate for speed
         prompt = (
-            "너는 한국어 상담 대화 도우미다. 사용자 입력에 대해 반응 계획을 JSON으로만 출력해라.\n"
-            "규칙:\n"
-            "- 아직 사용자가 말을 이어가는 느낌이면 sendCount=0, messages=[]\n"
-            "- 아니면 1~2개의 짧은 메시지로 공감+질문 중심\n"
-            "- 문장은 교훈체/원칙설명체를 피하고 사용자의 표현을 반영\n"
-            f"사용자 입력: {user_text}\n"
-            "형식:\n"
-            '{"sendCount":1,"reason":"...","nextState":"reflective_pause","messages":[{"content":"...","delayMs":600,"presenceBeforeSend":"typing"}]}'
+            "JSON만 출력. 사용자가 말을 이어갈 것 같으면 sendCount=0. 아니면 1~2개 짧은 메시지.\n"
+            "공감+구체적질문. 뻔한 말 금지.\n"
+            f"사용자: {user_text}\n"
+            '출력: {"sendCount":'
         )
-        data = _extract_json(_gen(prompt, max_new_tokens=260, temperature=0.65))
-
+        data = _extract_json("{\"sendCount\":" + _gen(prompt, max_new_tokens=180, temperature=0.6
         # Lightweight guardrails
         msgs = data.get("messages", []) if isinstance(data.get("messages", []), list) else []
         safe_msgs: List[Dict[str, Any]] = []

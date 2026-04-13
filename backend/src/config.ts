@@ -27,10 +27,10 @@ export const config = {
   proactivePollMs: num('PROACTIVE_POLL_MS', 5000),
   proactiveMinSilenceMs: num('PROACTIVE_MIN_SILENCE_MS', 120000),
   proactiveCooldownMs: num('PROACTIVE_COOLDOWN_MS', 240000),
-  userContinuationGraceMs: num('USER_CONTINUATION_GRACE_MS', 1800),
-  reactiveResponseMaxWaitMs: num('REACTIVE_RESPONSE_MAX_WAIT_MS', 30000),
+  userContinuationGraceMs: num('USER_CONTINUATION_GRACE_MS', 600),  // Reduced from 1800ms for faster response
+  reactiveResponseMaxWaitMs: num('REACTIVE_RESPONSE_MAX_WAIT_MS', 20000),  // Reduced from 30s
   mockProvider: process.env.MOCK_PROVIDER !== 'false',
   llmProvider: providerMode(),
   hfLocalUrl: process.env.HF_LOCAL_URL ?? 'http://127.0.0.1:8010',
-  hfLocalTimeoutMs: num('HF_LOCAL_TIMEOUT_MS', 40000)
+  hfLocalTimeoutMs: num('HF_LOCAL_TIMEOUT_MS', 30000)  // Reduced from 40s
 } as const;
