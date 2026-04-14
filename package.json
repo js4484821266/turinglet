@@ -21,7 +21,7 @@
     "test": "npm run test -w backend",
     "migrate": "npm run migrate -w database",
     "seed": "npm run seed -w database",
-    "llm:server": "cross-env KMP_DUPLICATE_LIB_OK=TRUE python local-llm/server.py"
+    "llm:server": "cross-env KMP_DUPLICATE_LIB_OK=TRUE .\\.venv-llm\\Scripts\\python.exe local-llm/server.py"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.22.0",
