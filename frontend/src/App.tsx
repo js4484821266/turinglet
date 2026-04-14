@@ -140,6 +140,12 @@ function AuthPanel() {
   );
 }
 
+function formatTimestamp(createdAt: string): string {
+  const d = new Date(createdAt);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}년 ${pad(d.getMonth() + 1)}월 ${pad(d.getDate())}일 ${pad(d.getHours())}시 ${pad(d.getMinutes())}분 ${pad(d.getSeconds())}초`;
+}
+
 function ChatPanel() {
   const sessionId = useAppStore((s) => s.sessionId);
   const messages = useAppStore((s) => s.messages);
@@ -274,7 +280,10 @@ function ChatPanel() {
       <div className="messages">
         {messages.map((m) => (
           <div key={m.id} className={`bubble-row ${m.role === 'user' ? 'mine' : 'theirs'}`}>
-            <div className={`bubble ${m.role === 'user' ? 'mine' : 'theirs'}`}>{m.content}</div>
+            <div className="bubble-col">
+              <div className={`bubble ${m.role === 'user' ? 'mine' : 'theirs'}`}>{m.content}</div>
+              <div className="msg-timestamp">{formatTimestamp(m.createdAt)}</div>
+            </div>
           </div>
         ))}
         {threadStatusText ? <div className="thread-status">{threadStatusText}</div> : null}
