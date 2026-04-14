@@ -35,11 +35,17 @@ MODEL_FILE = os.getenv("HF_MODEL_FILE", "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf")
 HOST = os.getenv("HF_LOCAL_HOST", "127.0.0.1")
 PORT = int(os.getenv("HF_LOCAL_PORT", "8010"))
 
-_model_path = hf_hub_download(repo_id=MODEL_REPO, filename=MODEL_FILE)
+try:
+    _model_path = hf_hub_download(repo_id=MODEL_REPO, filename=MODEL_FILE)
+except Exception as exc:
+    raise RuntimeError(
+        f"Failed to download model '{MODEL_FILE}' from '{MODEL_REPO}'. "
+        "Check your internet connection or set HF_MODEL_REPO / HF_MODEL_FILE env vars."
+    ) from exc
 llm = Llama(
     model_path=_model_path,
     n_ctx=2048,
-    n_threads=os.cpu_count() or 4,
+    n_threads=max(1, (os.cpu_count() or 4) // 2),
     verbose=False,
 )
 
