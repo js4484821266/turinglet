@@ -31,6 +31,27 @@ turinglet/
 	local-llm/         로컬 LLM 서버(FastAPI)
 ```
 
+## 아키텍처 다이어그램 (Mermaid)
+
+```mermaid
+flowchart LR
+	U[User] --> FE[Frontend\nReact + Zustand]
+	FE <--> BE[Backend API\nExpress + Socket.IO]
+	BE <--> DB[(Database\nSQLite / PostgreSQL)]
+	BE --> SC[Scheduler\nReactive / Proactive]
+	BE --> SH[Shared Types]
+	BE --> LLM{LLM Provider}
+	LLM --> MOCK[Mock Provider]
+	LLM --> HF[HF Local Provider]
+	HF <--> HFS[local-llm server.py\nFastAPI]
+```
+
+설명
+
+- 사용자 메시지는 Frontend에서 Backend로 전달되고, Socket.IO로 실시간 상태와 메시지가 동기화됩니다.
+- Backend는 Scheduler 정책을 통해 "지금 답할지, 잠시 기다릴지"를 결정합니다.
+- LLM Provider는 환경변수에 따라 mock 또는 hf-local 경로를 선택합니다.
+
 ## 빠른 시작
 
 ### 1) 의존성 설치
