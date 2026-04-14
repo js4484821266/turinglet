@@ -52,11 +52,13 @@ function pickIntensityFromText(text: string): number {
   return 3;
 }
 
-function buildBurst(lines: string[], startDelay = 500, stepDelay = 650): OutboundMessageInstruction[] {
+const BURST_PRESENCE_SEQUENCE = ['typing', 'thinking', 'organizing'] as const;
+
+function buildBurst(lines: string[], startDelay = 1200, stepDelay = 2200): OutboundMessageInstruction[] {
   return lines.map((content, index) => ({
     content,
     delayMs: startDelay + index * stepDelay,
-    presenceBeforeSend: index === lines.length - 1 ? 'waiting' : index % 2 === 0 ? 'organizing' : 'thinking'
+    presenceBeforeSend: BURST_PRESENCE_SEQUENCE[index % BURST_PRESENCE_SEQUENCE.length]
   }));
 }
 
@@ -203,7 +205,7 @@ export class MockProvider implements LLMProviderAdapter {
         lines.push(linePool[i % linePool.length] ?? selectedEmpathy);
       }
 
-      const messages = buildBurst(lines, 550, longNarrative ? 520 : 850);
+      const messages = buildBurst(lines, 1200, longNarrative ? 1800 : 2200);
       return {
         sendCount: messages.length,
         reason: longNarrative
@@ -222,7 +224,7 @@ export class MockProvider implements LLMProviderAdapter {
           '해결책을 많이 찾기보다, 지금 가장 버거운 한 장면부터 같이 보죠.'
         ])
       ];
-      const messages = buildBurst(questionLines, 600, 1100);
+      const messages = buildBurst(questionLines, 1400, 2800);
       return {
         sendCount: messages.length,
         reason: 'Question asked: empathy + one focused question.',
@@ -243,7 +245,7 @@ export class MockProvider implements LLMProviderAdapter {
         '필요하면 이 대화를 짧은 단위로 나눠서 이어가도 좋아요.'
       ])
     ].slice(0, baseCount);
-    const baseMessages = buildBurst(baseLines, 700, 900);
+    const baseMessages = buildBurst(baseLines, 1200, 2200);
 
     return {
       sendCount: baseMessages.length,
