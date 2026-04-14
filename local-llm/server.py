@@ -4,13 +4,10 @@ import json
 import os
 from typing import Any, Dict, List, Literal, Optional
 
-# Windows local run workaround for duplicated OpenMP runtimes loaded by ML deps.
-# Allows startup for local prototype environments where torch/numpy stacks collide.
-os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
-
 from fastapi import FastAPI
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
 from pydantic import BaseModel
-from transformers import pipeline
 import uvicorn
 
 
@@ -28,37 +25,44 @@ class GenerateResponse(BaseModel):
     error: Optional[str] = None
 
 
-app = FastAPI(title="Turinglet Local HF LLM")
+app = FastAPI(title="Turinglet Local LLM")
 
 
-# CPU-only baseline model. Change via HF_MODEL env if needed.
-# Small model for local experimentation (quality is limited but non-rule-based).
-MODEL_NAME = os.getenv("HF_MODEL", "Qwen/Qwen2.5-0.5B-Instruct")
+# Lightweight quantized GGUF model — much lower CPU/memory than full-precision torch.
+# Override via HF_MODEL_REPO / HF_MODEL_FILE env vars.
+MODEL_REPO = os.getenv("HF_MODEL_REPO", "bartowski/Qwen2.5-1.5B-Instruct-GGUF")
+MODEL_FILE = os.getenv("HF_MODEL_FILE", "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf")
 HOST = os.getenv("HF_LOCAL_HOST", "127.0.0.1")
 PORT = int(os.getenv("HF_LOCAL_PORT", "8010"))
 
-text_gen = pipeline(
-    "text-generation",
-    model=MODEL_NAME,
+try:
+    _model_path = hf_hub_download(repo_id=MODEL_REPO, filename=MODEL_FILE)
+except Exception as exc:
+    raise RuntimeError(
+        f"Failed to download model '{MODEL_FILE}' from '{MODEL_REPO}'. "
+        "Check your internet connection or set HF_MODEL_REPO / HF_MODEL_FILE env vars."
+    ) from exc
+llm = Llama(
+    model_path=_model_path,
+    n_ctx=2048,
+    n_threads=max(1, (os.cpu_count() or 4) // 2),
+    verbose=False,
 )
 
 
-def _gen(prompt: str, max_new_tokens: int = 100, temperature: float = 0.7) -> str:
-    """Generate text with reduced tokens for faster inference."""
-    out = text_gen(
-        prompt,
-        max_new_tokens=max_new_tokens,
-        do_sample=True,
+def _chat(system: str, user: str, max_tokens: int = 200, temperature: float = 0.7) -> str:
+    """Generate a response using the chat-completion interface."""
+    output = llm.create_chat_completion(
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        max_tokens=max_tokens,
         temperature=temperature,
         top_p=0.9,
-        repetition_penalty=1.05,
+        repeat_penalty=1.05,
     )
-    if not out:
-        return ""
-    text = out[0].get("generated_text", "")
-    if text.startswith(prompt):
-        text = text[len(prompt):]
-    return text.strip()
+    return output["choices"][0]["message"]["content"].strip()  # type: ignore[index]
 
 
 def _extract_json(text: str) -> Dict[str, Any]:
@@ -71,70 +75,61 @@ def _extract_json(text: str) -> Dict[str, Any]:
 
 @app.get("/health")
 def health() -> Dict[str, Any]:
-    return {"ok": True, "model": MODEL_NAME}
+    return {"ok": True, "model": f"{MODEL_REPO}/{MODEL_FILE}"}
 
 
 @app.post("/v1/generate", response_model=GenerateResponse)
 def generate(req: GenerateRequest) -> GenerateResponse:
     try:
         if req.task == "single_message":
-            intent = req.payload.get("intent", "reflection")
-            user_text = (req.payload.get("userText") or "").strip()[:200]  # Truncate for speed
-            prompt = (
-                "너는 따뜻하고 자연스러운 상담 도우미다.\n"
-                "1~2문장만. 공감 + 구체적 질문. 뻔한 말/교훈 금지.\n\n"
-                f"사용자: {user_text}\n대답:"
+            user_text = (req.payload.get("userText") or "").strip()[:300]
+            system = (
+                "너는 따뜻하고 자연스러운 상담 도우미다. "
+                "1~2문장만. 공감 + 구체적 질문. 뻔한 말/교훈 금지."
             )
-            return GenerateResponse(ok=True, result=_gen(prompt, max_new_tokens=80, temperature=0.75))
+            return GenerateResponse(ok=True, result=_chat(system, user_text, max_tokens=100, temperature=0.75))
 
         if req.task == "summary":
             messages = req.payload.get("recentMessages", [])
             latest_user = ""
             for m in reversed(messages):
                 if m.get("role") == "user":
-                    latest_user = m.get("content", "")[:150]  # Truncate
+                    latest_user = m.get("content", "")[:200]
                     break
-            prompt = (
-                "감정 강도(0~10)와 한 줄만. JSON: {\"emotionalIntensity\": N, \"summary\": \"...\"}\n"
-                f"발화: {latest_user}\n{{"
+            system = (
+                "감정 강도(0~10)와 한 줄 요약을 JSON으로만 출력하라. "
+                '형식: {"emotionalIntensity": N, "summary": "..."}'
             )
-            data = _extract_json("{" + _gen(prompt, max_new_tokens=60, temperature=0.1))
+            raw = _chat(system, latest_user, max_tokens=80, temperature=0.1)
+            data = _extract_json(raw)
             return GenerateResponse(ok=True, result=data)
 
         if req.task == "silence_meaning":
             snapshot = req.payload.get("snapshot", {})
-            user_typing = bool(snapshot.get("userTyping", False))
-            if user_typing:
+            if bool(snapshot.get("userTyping", False)):
                 return GenerateResponse(ok=True, result="typing")
-
-            prompt = (
-                "다음 상황에서 침묵 의미를 하나 고르라: crying, organizing_thoughts, emotionally_overwhelmed, away, typing\n"
-                f"상황: {json.dumps(req.payload, ensure_ascii=False)}\n"
-                "정답 하나만 출력:"
+            system = (
+                "다음 상황에서 침묵 의미를 하나 고르라: crying, organizing_thoughts, "
+                "emotionally_overwhelmed, away, typing\n정답 하나만 출력."
             )
-            raw = _gen(prompt, max_new_tokens=16, temperature=0.0).strip()
-            allowed = {
-                "crying",
-                "organizing_thoughts",
-                "emotionally_overwhelmed",
-                "away",
-                "typing",
-            }
+            raw = _chat(system, json.dumps(req.payload, ensure_ascii=False), max_tokens=16, temperature=0.0).strip()
+            allowed = {"crying", "organizing_thoughts", "emotionally_overwhelmed", "away", "typing"}
             value = raw.split()[0].strip().lower()
             if value not in allowed:
                 value = "organizing_thoughts"
             return GenerateResponse(ok=True, result=value)
 
-        # multi_plan - optimize for speed and clarity
-        user_text = (req.payload.get("userText") or "").strip()[:250]  # Truncate for speed
-        prompt = (
+        # multi_plan
+        user_text = (req.payload.get("userText") or "").strip()[:300]
+        system = (
             "JSON만 출력. 사용자가 말을 이어갈 것 같으면 sendCount=0, 아니면 1~2개 짧은 메시지.\n"
             "공감+구체적 질문, 뻔한 말 금지.\n"
-            f"사용자: {user_text}\n"
-            "형식: {\"sendCount\":1,\"reason\":\"...\",\"nextState\":\"reflective_pause\",\"messages\":[{\"content\":\"...\",\"delayMs\":600,\"presenceBeforeSend\":\"typing\"}]}"
+            '형식: {"sendCount":1,"reason":"...","nextState":"reflective_pause",'
+            '"messages":[{"content":"...","delayMs":600,"presenceBeforeSend":"typing"}]}'
         )
-        data = _extract_json(_gen(prompt, max_new_tokens=180, temperature=0.6))
-        # Lightweight guardrails
+        raw = _chat(system, user_text, max_tokens=250, temperature=0.6)
+        data = _extract_json(raw)
+
         msgs = data.get("messages", []) if isinstance(data.get("messages", []), list) else []
         safe_msgs: List[Dict[str, Any]] = []
         for item in msgs[:2]:
@@ -172,7 +167,7 @@ def generate(req: GenerateRequest) -> GenerateResponse:
             data["messages"] = safe_msgs
             data["sendCount"] = len(safe_msgs)
             data["nextState"] = data.get("nextState", "reflective_pause")
-            data["reason"] = str(data.get("reason", "hf_local_plan"))
+            data["reason"] = str(data.get("reason", "llm_plan"))
 
         return GenerateResponse(ok=True, result=data)
 

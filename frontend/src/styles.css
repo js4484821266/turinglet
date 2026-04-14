@@ -222,8 +222,28 @@ tr.selected {
   justify-content: flex-end;
 }
 
-.bubble {
+.bubble-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   max-width: min(80%, 520px);
+}
+
+.bubble-row.mine .bubble-col {
+  align-items: flex-end;
+}
+
+.bubble-row.theirs .bubble-col {
+  align-items: flex-start;
+}
+
+.msg-timestamp {
+  font-size: 11px;
+  color: #8a9aa3;
+  padding: 0 4px;
+}
+
+.bubble {
   border-radius: 16px;
   padding: 12px 14px;
   line-height: 1.45;
