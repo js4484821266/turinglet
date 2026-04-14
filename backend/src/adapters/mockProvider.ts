@@ -52,12 +52,13 @@ function pickIntensityFromText(text: string): number {
   return 3;
 }
 
+const BURST_PRESENCE_SEQUENCE = ['typing', 'thinking', 'organizing'] as const;
+
 function buildBurst(lines: string[], startDelay = 1200, stepDelay = 2200): OutboundMessageInstruction[] {
-  const presenceSequence = ['typing', 'thinking', 'organizing'] as const;
   return lines.map((content, index) => ({
     content,
     delayMs: startDelay + index * stepDelay,
-    presenceBeforeSend: presenceSequence[index % presenceSequence.length]
+    presenceBeforeSend: BURST_PRESENCE_SEQUENCE[index % BURST_PRESENCE_SEQUENCE.length]
   }));
 }
 

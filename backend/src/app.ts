@@ -368,7 +368,7 @@ export function createApp(): AppServices {
 
     // Summarize conversation state in background after response is sent
     setImmediate(() => {
-      (async () => {
+      void (async () => {
         try {
           const recent = await store.listMessages(identity.sessionId, 30);
           const summary = await provider.summarizeConversationState({
