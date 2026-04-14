@@ -125,16 +125,15 @@ def generate(req: GenerateRequest) -> GenerateResponse:
                 value = "organizing_thoughts"
             return GenerateResponse(ok=True, result=value)
 
-        # multi_plan
-        user_text =  - optimize for speed and clarity
+        # multi_plan - optimize for speed and clarity
         user_text = (req.payload.get("userText") or "").strip()[:250]  # Truncate for speed
         prompt = (
-            "JSON만 출력. 사용자가 말을 이어갈 것 같으면 sendCount=0. 아니면 1~2개 짧은 메시지.\n"
-            "공감+구체적질문. 뻔한 말 금지.\n"
+            "JSON만 출력. 사용자가 말을 이어갈 것 같으면 sendCount=0, 아니면 1~2개 짧은 메시지.\n"
+            "공감+구체적 질문, 뻔한 말 금지.\n"
             f"사용자: {user_text}\n"
-            '출력: {"sendCount":'
+            "형식: {\"sendCount\":1,\"reason\":\"...\",\"nextState\":\"reflective_pause\",\"messages\":[{\"content\":\"...\",\"delayMs\":600,\"presenceBeforeSend\":\"typing\"}]}"
         )
-        data = _extract_json("{\"sendCount\":" + _gen(prompt, max_new_tokens=180, temperature=0.6
+        data = _extract_json(_gen(prompt, max_new_tokens=180, temperature=0.6))
         # Lightweight guardrails
         msgs = data.get("messages", []) if isinstance(data.get("messages", []), list) else []
         safe_msgs: List[Dict[str, Any]] = []
