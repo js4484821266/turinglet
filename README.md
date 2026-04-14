@@ -1,253 +1,156 @@
 # Turinglet
 
-사용자의 입력 상태와 침묵을 함께 고려해, 언제 답하고 언제 기다리고 언제 먼저 짧게 말을 걸지 결정하는 이벤트 기반 AI 대화 프로토타입입니다.
+사용자 발화 내용뿐 아니라 입력 상태와 침묵 구간까지 고려해, 대화 타이밍을 운영하는 이벤트 기반 AI 채팅 프로토타입입니다.
 
-## 프로젝트 소개
+## 한눈에 보기
 
-Turinglet은 일반적인 1문 1답 챗봇이 아니라, AI가 **언제 바로 답하고 언제 기다리고 언제 먼저 말을 걸지**를 정하는 대화 흐름 제어 실험입니다.
+- 일반적인 1문 1답 챗봇이 아니라, 언제 답할지와 언제 기다릴지를 분리해서 다룹니다.
+- 사용자 타이핑 중에는 끼어들지 않고, 중단 시점에 맞춰 반응 계획을 다시 계산합니다.
+- 상황에 따라 메시지를 0개, 1개, 여러 개로 나눠 보낼 수 있습니다.
+- 로컬 규칙 기반(mock) 모드와 로컬 Hugging Face 모델(hf-local) 모드를 모두 지원합니다.
 
-이 프로젝트의 핵심은 답변 문장 자체보다도, AI가 대화의 타이밍을 어떻게 운영하느냐에 있습니다. 사용자가 말이 끊겼을 때를 단순한 미응답으로 보지 않고, 입력 중인지, 생각을 정리하는 중인지, 잠시 자리를 비운 것인지, 감정적으로 부담이 큰 상태인지 등을 나눠 보려는 구조로 만들었습니다.
+## 핵심 기능
 
-이 프로젝트는 실제 상담 서비스를 대체하려는 목적이 아니라, 대화 흐름 설계와 상태 기반 응답 정책을 실험하기 위한 포트폴리오용 프로토타입입니다.
+- 실시간 채팅 UI (Socket.IO)
+- 입력 중 상태 전송 및 반영
+- 대화 스냅샷 기반 반응 계획 생성
+- 침묵 구간 선제 메시지 스케줄링
+- QR 기반 가입/로그인과 세션 복원
+- 관리자 조회 API (사용자, 세션, 메시지, proactive 이벤트)
+- SQLite 기본 지원, PostgreSQL 교체 가능
 
-## 스크린샷
+## 워크스페이스 구조
 
-(업데이트 예정)
+```text
+turinglet/
+	frontend/          React + Vite + Zustand
+	backend/           Express + Socket.IO + orchestration
+	database/          DB migration/seed
+	scheduler/         proactive/reactive scheduling policy
+	shared/            공용 타입 계약
+	local-llm/         로컬 LLM 서버(FastAPI)
+```
 
-## 기존 턴제 챗봇과 다른 점
+## 빠른 시작
 
-- 일반적인 1문 1답 턴제가 아닙니다.
-- AI가 상황에 따라 먼저 짧게 말을 걸 수 있습니다.
-- 사용자가 입력 중이면 끼어들지 않습니다.
-- 사용자의 침묵을 단순 미응답이 아니라 여러 가능성으로 해석하려고 시도합니다.
-- 한 번에 메시지 0개, 1개, 2개 이상을 보낼 수 있습니다.
-- 메시지를 꼭 길게 만들기보다, 상황에 따라 여러 짧은 문장으로 나눠 보낼 수 있습니다.
-
-## 주요 기능
-
-- 메신저 형태의 채팅 UI
-- Enter 전송, Shift+Enter 줄바꿈
-- AI 상태 표시: 생각 중, 정리 중, 잠시 기다리는 중, 타이핑 중
-- QR 기반 가입/로그인
-- 기존 세션 재사용으로 대화 기록 복원
-- 사용자 입력 중 상태 추적
-- 침묵 기반 선제 메시지 스케줄링
-- 대화 흐름에 따라 0개/1개/다중 메시지 전송
-- 관리자 대시보드에서 사용자/세션/메시지/선제 이벤트 확인
-- 로컬 SQLite 기본, PostgreSQL로 교체 가능한 저장 구조
-- 실제 LLM 없이도 동작하는 mock 모드
-
-## 예시 동작 방식
-
-### 1. 사용자가 장황하게 말하는 경우
-- AI가 바로 단답을 치지 않고 잠깐 기다립니다.
-- 필요하면 공감 메시지를 먼저 보내고, 그 뒤에 짧게 한 번 더 이어서 말합니다.
-- 무거운 맥락에서는 여러 짧은 메시지로 나눠 보낼 수 있습니다.
-
-### 2. 사용자가 말이 끊긴 경우
-- 단순히 "응답 없음"으로 보지 않습니다.
-- 입력 중인지, 생각을 정리 중인지, 너무 힘든 상태인지, 자리를 비운 것인지 등을 나눠서 판단하려고 합니다.
-- 바로 재촉하기보다 짧은 공감 메시지 후 대기하는 쪽을 우선합니다.
-
-### 3. 사용자가 계속 입력 중인 경우
-- AI가 먼저 끼어들지 않습니다.
-- 사용자가 입력을 멈춘 뒤에만 선제 메시지 후보를 검토합니다.
-
-## 프로젝트 의의
-
-이 프로젝트는 "잘 답하는 챗봇"보다, "대화의 흐름을 어떻게 운영할 것인가"를 보여주는 데 초점을 맞췄습니다.
-
-이 프로젝트에서 강조할 수 있는 구현 포인트는 다음과 같습니다.
-
-- 턴제 모델이 아닌 이벤트 기반 대화 운영을 구현했다는 점
-- 침묵을 하나의 상태로 보지 않고 여러 가능성으로 분해했다는 점
-- 사용자 타이핑과 발화 타이밍을 별도의 정책으로 다뤘다는 점
-- 메시지 생성과 메시지 발송 결정을 분리했다는 점
-- 로컬 실행, 기록 저장, 관리자 관측까지 포함한 최소한의 제품 형태를 만들었다는 점
-
-## 한계
-
-- mock provider는 규칙 기반이라 실제 상담 품질을 판단하는 모델은 아닙니다.
-- 고위험 정서 상황에 대한 대응은 아직 단순한 수준입니다.
-- 관리자 대시보드는 내부 확인용에 가깝고, 실제 서비스 수준의 권한 제어는 없습니다.
-- 대화 품질을 수치로 평가하는 체계는 아직 약합니다.
-- QR 로그인은 편하지만, 실제 배포 환경에서는 보안 설계가 더 필요합니다.
-
-## 향후 개선점
-
-- 실제 LLM provider(OpenAI, Anthropic 등) 연동
-- 침묵 해석 로직 고도화
-- 감정 강도 추정과 안전 응답 분리
-- 관리자 대시보드에 실패 원인/세션 상태 시각화 추가
-- 정량 지표 추가: 응답 지연, 대기 비율, 개입 횟수, 재개 대화 성공률
-- PostgreSQL 마이그레이션 자동화
-- 프로덕션용 인증/권한 제어 강화
-
-## 실행 방법
-
-### 1. 설치
+### 1) 의존성 설치
 
 ```bash
 npm install
 ```
 
-### 2. 환경변수 준비
+### 2) 환경 변수 파일 준비
 
 ```bash
 cp .env.example .env
 ```
 
-기본은 mock 규칙형입니다. 진짜 로컬 모델(Hugging Face)로 바꾸려면 `.env`에서 아래처럼 변경하세요.
-
-```bash
-LLM_PROVIDER=hf-local
-HF_LOCAL_URL=http://127.0.0.1:8010
-```
-
-API 키 없이 로컬 Hugging Face 서버 실행:
-
-```bash
-pip install -r local-llm/requirements.txt
-python local-llm/server.py
-```
-
-서버가 뜨면 백엔드가 자동으로 해당 로컬 모델을 호출합니다.
-
-### 2-1. 진짜 AI 모드 체크리스트 (직접 해야 하는 것)
-
-- `.env`에서 아래 2줄이 반드시 설정되어 있어야 합니다.
-
-```bash
-LLM_PROVIDER=hf-local
-HF_LOCAL_URL=http://127.0.0.1:8010
-```
-
-- 로컬 LLM 서버를 먼저 실행해야 합니다.
-
-```bash
-npm run llm:server
-```
-
-- 로컬 LLM 서버가 살아있는지 확인합니다.
-
-```bash
-curl http://127.0.0.1:8010/health
-```
-
-PowerShell에서는:
+Windows PowerShell에서는 아래를 사용합니다.
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8010/health
+Copy-Item .env.example .env
 ```
 
-- 서버를 켠 뒤 `npm run dev`를 다시 실행해야 반영됩니다.
+### 3) DB 준비
 
-### 2-2. 여전히 rule-based처럼 보일 때
+```bash
+npm run migrate
+```
 
-- `LLM_PROVIDER=mock` 또는 `MOCK_PROVIDER=true`로 실행 중인지 확인
-- `python local-llm/server.py`가 즉시 종료되면 패키지 설치/환경 오류 가능성 점검
-- `OMP: Error #15`가 나오면 새 가상환경에서 다시 설치
+### 4) 앱 실행
+
+```bash
+npm run dev
+```
+
+기본 접속 주소
+
+- frontend: http://localhost:5173
+- backend: http://localhost:4000
+
+## 로컬 LLM 모드(hf-local)
+
+기본값은 mock 모드입니다. 로컬 모델로 실행하려면 아래 두 값을 설정합니다.
+
+```env
+LLM_PROVIDER=hf-local
+HF_LOCAL_URL=http://127.0.0.1:8010
+```
+
+### 권장 실행 순서 (Windows)
 
 ```powershell
 python -m venv .venv-llm
 .\.venv-llm\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r local-llm/requirements.txt
-python local-llm/server.py
+npm run llm:server
 ```
 
-### 3. DB 초기화
+서버 상태 확인
 
-```bash
-npm run migrate
+```powershell
+curl.exe http://127.0.0.1:8010/health
 ```
 
-### 4. 실행
+예상 응답
 
-```bash
-npm run dev
+```json
+{"ok":true,"model":"Qwen/Qwen2.5-0.5B-Instruct"}
 ```
 
-백엔드만 실행하려면:
+LLM 서버를 켠 뒤에는 앱 서버를 다시 띄우는 것이 안전합니다.
+
+## 자주 쓰는 스크립트
 
 ```bash
-npm run dev:server
+npm run dev           # backend + frontend 동시 실행
+npm run dev:server    # backend만
+npm run dev:client    # frontend만
+npm run dev:desktop   # backend + frontend + electron
+npm run build         # 전체 빌드
+npm run test          # backend 테스트
+npm run llm:server    # 로컬 LLM 서버 실행
 ```
 
-프론트만 실행하려면:
+## 주요 환경 변수
+
+- PORT: backend 포트 (기본 4000)
+- DB_PROVIDER: sqlite 또는 postgres
+- SQLITE_PATH: sqlite 파일 경로
+- POSTGRES_URL: postgres 연결 문자열
+- LLM_PROVIDER: mock 또는 hf-local
+- HF_LOCAL_URL: 로컬 LLM 서버 주소
+- HF_LOCAL_TIMEOUT_MS: hf-local 요청 타임아웃
+- USER_CONTINUATION_GRACE_MS: 사용자가 이어서 입력할 여지를 기다리는 시간
+- REACTIVE_RESPONSE_MAX_WAIT_MS: reactive 응답 최대 대기 시간
+
+## 트러블슈팅
+
+### npm run llm:server 실행 실패
+
+- 현재 파이썬 환경이 맞는지 먼저 확인합니다.
+- 가상환경을 새로 만들고 requirements를 다시 설치합니다.
+- 포트 충돌이 있으면 8010 포트를 점유한 프로세스를 종료합니다.
+
+### OMP: Error #15 또는 OpenMP 충돌
+
+- 새 가상환경에서 패키지를 다시 설치합니다.
+- 필요하면 세션에서 KMP_DUPLICATE_LIB_OK=TRUE를 지정합니다.
+
+### 응답이 너무 느리거나 부자연스러움
+
+- LLM_PROVIDER가 hf-local인지 확인합니다.
+- health 엔드포인트가 즉시 응답하는지 확인합니다.
+- 로컬 모델 품질 한계가 있으므로 모델 크기/종류 변경을 검토합니다.
+
+## 테스트 및 품질 확인
 
 ```bash
-npm run dev:client
-```
-
-데스크톱 창(Electron)까지 같이 실행하려면:
-
-```bash
-npm run dev:desktop
-```
-
-### 5. 테스트
-
-```bash
+npm run build
 npm run test
 ```
 
-실행 후:
-- backend: `http://localhost:4000`
-- frontend: `http://localhost:5173`
+## 안내
 
-## 기술 스택
-
-### Frontend
-- React
-- TypeScript
-- Vite
-- Zustand
-- socket.io-client
-- @zxing/browser
-
-### Desktop (선택)
-- Electron
-
-### Backend
-- Node.js
-- Express
-- Socket.IO
-- TypeScript
-- better-sqlite3
-- pg
-- qrcode
-- Zod
-
-### 공용/기타
-- shared 타입 패키지
-- scheduler 정책 엔진
-- prompt-engineering 분리
-- Vitest
-- Supertest
-
-## 왜 이 스택을 썼는가
-
-- React: 메신저형 UI를 빠르게 만들기 쉬워서
-- TypeScript: 대화 상태와 정책 계약을 명확하게 유지하기 위해
-- SQLite: 설치 부담이 적고 로컬 데모에 적합해서
-- PostgreSQL: 나중에 교체할 수 있게 구조를 남기기 위해
-- Socket.IO: AI 상태와 메시지를 실시간으로 보여주기 위해
-- QR 라이브러리: 이메일/비밀번호 없이 로그인 흐름을 만들기 위해
-- Zustand: 복잡하지 않은 상태 관리를 위해
-- Electron(선택): 로컬 데스크톱 데모가 필요할 때만 켤 수 있도록 분리해서 운영 모드와 충돌을 줄이기 위해
-
-## 정리
-
-Turinglet은 "상담사처럼 말하는 챗봇"을 만드는 프로젝트라기보다, **대화 흐름을 운영하는 방식**을 실험한 프로토타입입니다.
-
-즉, 무엇을 말하느냐보다도
-
-- 언제 답할지
-- 언제 기다릴지
-- 언제 먼저 말을 걸지
-- 몇 개의 짧은 메시지로 쪼갤지
-
-를 다루는 데 초점을 맞췄습니다.
-
-이런 점에서 일반적인 챗봇 데모와 조금 다른 포트폴리오로 보여주기 위해 만든 프로젝트입니다.
+이 저장소는 대화 흐름 제어 실험을 위한 프로토타입입니다. 실제 의료/상담 서비스를 대체하지 않으며, 고위험 상황 대응을 위한 별도 안전 설계가 필요합니다.
