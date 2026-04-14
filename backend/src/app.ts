@@ -354,17 +354,7 @@ export function createApp(): AppServices {
     });
     emitMessage(userMessage);
 
-    const recent = await store.listMessages(identity.sessionId, 30);
-    const summary = await provider.summarizeConversationState({
-      sessionId: identity.sessionId,
-      recentMessages: recent
-    });
-    await store.upsertEmotionalSnapshot({
-      sessionId: identity.sessionId,
-      intensity: summary.emotionalIntensity,
-      summary: summary.summary
-    });
-
+    // Return 202 immediately so the client's send button is released without waiting for LLM
     scheduleReactivePlan({
       sessionId: identity.sessionId,
       userText: parsed.data.content
@@ -374,6 +364,26 @@ export function createApp(): AppServices {
       accepted: true,
       planReason: 'deferred_reactive_planning',
       sendCount: null
+    });
+
+    // Summarize conversation state in background after response is sent
+    setImmediate(() => {
+      (async () => {
+        try {
+          const recent = await store.listMessages(identity.sessionId, 30);
+          const summary = await provider.summarizeConversationState({
+            sessionId: identity.sessionId,
+            recentMessages: recent
+          });
+          await store.upsertEmotionalSnapshot({
+            sessionId: identity.sessionId,
+            intensity: summary.emotionalIntensity,
+            summary: summary.summary
+          });
+        } catch (error) {
+          console.error('Background summarization failed', error);
+        }
+      })();
     });
   });
 

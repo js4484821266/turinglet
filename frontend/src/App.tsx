@@ -154,6 +154,11 @@ function ChatPanel() {
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | undefined>();
   const typingTimer = useRef<number | undefined>();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -231,7 +236,6 @@ function ChatPanel() {
           headers: { 'x-session-id': sessionId }
         }
       );
-      void refreshMessages().catch(() => undefined);
     } catch (error: unknown) {
       let message = '전송 실패: 잠시 후 다시 시도해주세요.';
       if (axios.isAxiosError(error)) {
@@ -274,9 +278,10 @@ function ChatPanel() {
           </div>
         ))}
         {threadStatusText ? <div className="thread-status">{threadStatusText}</div> : null}
+        <div ref={messagesEndRef} />
       </div>
 
-      <div className="typing-row">내 입력 상태: {userTyping ? '입력 중' : '입력 없음'}</div>
+      {userTyping ? <div className="typing-row">입력 중...</div> : null}
 
       <div className="composer">
         <textarea
