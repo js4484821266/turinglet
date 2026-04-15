@@ -5,6 +5,9 @@ import { io } from 'socket.io-client';
 import { api, type AdminProactiveEventRow, type AdminSessionRow, type AdminUserRow, type ChatMessage } from './api';
 import { useAppStore } from './store';
 
+const configuredBackendOrigin = import.meta.env.VITE_BACKEND_ORIGIN?.trim();
+const backendOrigin = configuredBackendOrigin || `${window.location.protocol}//${window.location.hostname}:4000`;
+
 type ViewMode = 'chat' | 'admin';
 
 interface AdminOverview {
@@ -169,7 +172,7 @@ function ChatPanel() {
 
   useEffect(() => {
     if (!sessionId) return;
-    const socket = io('http://localhost:4000');
+    const socket = io(backendOrigin);
     socket.emit('join_session', sessionId);
 
     socket.on('message', (message: ChatMessage) => {

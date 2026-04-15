@@ -7,7 +7,7 @@ const server = http.createServer(app);
 const io = attachSocket(server);
 bindSocket(io);
 
-server.listen(config.port, () => {
+server.listen(config.port, '0.0.0.0', () => {
   startScheduler();
-  console.log(`Backend listening on http://localhost:${config.port}`);
+  console.log(`Backend listening on http://0.0.0.0:${config.port}`);
 });

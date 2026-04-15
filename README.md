@@ -112,6 +112,24 @@ npm run dev
 - frontend: http://localhost:5173
 - backend: http://localhost:4000
 
+### 5) 스마트폰에서 접속 (같은 Wi-Fi)
+
+이제 별도 `dev:mobile` 없이 `npm run dev`만 실행해도 스마트폰 접속이 가능합니다.
+
+1. PC와 스마트폰을 같은 Wi-Fi에 연결합니다.
+2. PC에서 `ipconfig`로 IPv4 주소를 확인합니다. (예: `192.168.0.12`)
+3. 스마트폰 브라우저에서 아래 주소로 접속합니다.
+
+```text
+http://192.168.0.12:5173
+```
+
+참고
+
+- 프론트는 LAN 바인딩(`0.0.0.0`)으로 실행됩니다.
+- API와 소켓은 접속한 호스트 IP 기준으로 자동 연결됩니다.
+- 접속이 안 되면 Windows 방화벽에서 5173, 4000 포트를 허용해야 합니다.
+
 ## 기술 스택
 
 - Frontend: React, TypeScript, Vite, Zustand, socket.io-client

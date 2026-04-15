@@ -1,7 +1,10 @@
 import axios from 'axios';
 
+const configuredBackendOrigin = import.meta.env.VITE_BACKEND_ORIGIN?.trim();
+const backendOrigin = configuredBackendOrigin || `${window.location.protocol}//${window.location.hostname}:4000`;
+
 export const api = axios.create({
-  baseURL: 'http://localhost:4000/api'
+  baseURL: `${backendOrigin}/api`
 });
 
 export interface ChatMessage {
