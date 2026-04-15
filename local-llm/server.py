@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import logging
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import FastAPI
@@ -9,6 +10,12 @@ from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
 from pydantic import BaseModel
 import uvicorn
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 TaskType = Literal["single_message", "multi_plan", "summary", "silence_meaning"]
@@ -52,17 +59,31 @@ llm = Llama(
 
 def _chat(system: str, user: str, max_tokens: int = 200, temperature: float = 0.7) -> str:
     """Generate a response using the chat-completion interface."""
-    output = llm.create_chat_completion(
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        max_tokens=max_tokens,
-        temperature=temperature,
-        top_p=0.9,
-        repeat_penalty=1.05,
-    )
-    return output["choices"][0]["message"]["content"].strip()  # type: ignore[index]
+    try:
+        output = llm.create_chat_completion(
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=0.9,
+            repeat_penalty=1.05,
+        )
+        result = output["choices"][0]["message"]["content"].strip()  # type: ignore[index]
+        return result
+    except Exception as e:
+        logger.error(f"Chat generation failed: {e}", exc_info=True)
+        raise
+
+
+def _safe_chat_with_fallback(system: str, user: str, max_tokens: int = 200, temperature: float = 0.7) -> str:
+    """Chat with error recovery to prevent server crash."""
+    try:
+        return _chat(system, user, max_tokens, temperature)
+    except Exception as e:
+        logger.warning(f"Chat failed, returning generic response: {e}")
+        return "지금은 잠시 생각해야 할 것 같아요. 다시 한 번 말씀해줄 수 있을까요?"
 
 
 def _extract_json(text: str) -> Dict[str, Any]:
@@ -87,7 +108,8 @@ def generate(req: GenerateRequest) -> GenerateResponse:
                 "너는 따뜻하고 자연스러운 상담 도우미다. "
                 "1~2문장만. 공감 + 구체적 질문. 뻔한 말/교훈 금지."
             )
-            return GenerateResponse(ok=True, result=_chat(system, user_text, max_tokens=100, temperature=0.75))
+            result = _safe_chat_with_fallback(system, user_text, max_tokens=100, temperature=0.75)
+            return GenerateResponse(ok=True, result=result)
 
         if req.task == "summary":
             messages = req.payload.get("recentMessages", [])
@@ -100,7 +122,7 @@ def generate(req: GenerateRequest) -> GenerateResponse:
                 "감정 강도(0~10)와 한 줄 요약을 JSON으로만 출력하라. "
                 '형식: {"emotionalIntensity": N, "summary": "..."}'
             )
-            raw = _chat(system, latest_user, max_tokens=80, temperature=0.1)
+            raw = _safe_chat_with_fallback(system, latest_user, max_tokens=80, temperature=0.1)
             data = _extract_json(raw)
             return GenerateResponse(ok=True, result=data)
 
@@ -112,7 +134,7 @@ def generate(req: GenerateRequest) -> GenerateResponse:
                 "다음 상황에서 침묵 의미를 하나 고르라: crying, organizing_thoughts, "
                 "emotionally_overwhelmed, away, typing\n정답 하나만 출력."
             )
-            raw = _chat(system, json.dumps(req.payload, ensure_ascii=False), max_tokens=16, temperature=0.0).strip()
+            raw = _safe_chat_with_fallback(system, json.dumps(req.payload, ensure_ascii=False), max_tokens=16, temperature=0.0).strip()
             allowed = {"crying", "organizing_thoughts", "emotionally_overwhelmed", "away", "typing"}
             value = raw.split()[0].strip().lower()
             if value not in allowed:
@@ -127,7 +149,7 @@ def generate(req: GenerateRequest) -> GenerateResponse:
             '형식: {"sendCount":1,"reason":"...","nextState":"reflective_pause",'
             '"messages":[{"content":"...","delayMs":600,"presenceBeforeSend":"typing"}]}'
         )
-        raw = _chat(system, user_text, max_tokens=250, temperature=0.6)
+        raw = _safe_chat_with_fallback(system, user_text, max_tokens=250, temperature=0.6)
         data = _extract_json(raw)
 
         msgs = data.get("messages", []) if isinstance(data.get("messages", []), list) else []
@@ -172,8 +194,11 @@ def generate(req: GenerateRequest) -> GenerateResponse:
         return GenerateResponse(ok=True, result=data)
 
     except Exception as exc:
+        logger.error(f"Generate request failed: {exc}", exc_info=True)
         return GenerateResponse(ok=False, error=str(exc))
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host=HOST, port=PORT, reload=False)
+    logger.info(f"Starting LLM server on {HOST}:{PORT}")
+    logger.info(f"Model: {MODEL_REPO}/{MODEL_FILE}")
+    uvicorn.run(app, host=HOST, port=PORT, reload=False, log_level="info")
