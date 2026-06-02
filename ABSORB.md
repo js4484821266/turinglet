@@ -147,12 +147,12 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    Register[displayName enableRecoveryCode] --> RegisterAPI[/api/auth/register]
+    Register[displayName enableRecoveryCode] --> RegisterAPI["/api/auth/register"]
     RegisterAPI --> UserTable[users]
     RegisterAPI --> TokenTable[identity_tokens token_hash]
     RegisterAPI --> QR[qrPayload qrDataUrl recoveryCode]
     QR --> LoginInput[QR 붙여넣기 또는 스캔]
-    LoginInput --> LoginAPI[/api/auth/login]
+    LoginInput --> LoginAPI["/api/auth/login"]
     LoginAPI --> SessionTable[sessions]
     SessionTable --> SessionId[x-session-id]
 ```
@@ -166,8 +166,8 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    Draft[사용자 draft] --> TypingAPI[/api/chat/typing]
-    Draft --> MessageAPI[/api/chat/messages]
+    Draft[사용자 draft] --> TypingAPI["/api/chat/typing"]
+    Draft --> MessageAPI["/api/chat/messages"]
     TypingAPI --> TypingTable[typing_presence]
     MessageAPI --> MessagesTable[messages user]
     MessagesTable --> Snapshot[ConversationSnapshot]
@@ -210,7 +210,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    BackendProvider[HuggingFaceLocalProvider] --> LocalAPI[/v1/generate]
+    BackendProvider[HuggingFaceLocalProvider] --> LocalAPI["/v1/generate"]
     LocalAPI --> Task{task}
     Task --> Single[single_message]
     Task --> Multi[multi_plan]
