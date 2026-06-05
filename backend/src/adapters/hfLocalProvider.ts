@@ -1,67 +1,11 @@
-import type {
-  ConversationSnapshot,
-  LLMProviderAdapter,
-  MessageRecord,
-  MultiMessagePlan,
-  OutboundMessageInstruction,
-  PresenceState,
-  SilenceMeaning
-} from '@turinglet/shared';
+import type { ConversationSnapshot, LLMProviderAdapter, MessageRecord, MultiMessagePlan, SilenceMeaning } from '@turinglet/shared';
 import { config } from '../config.js';
 import { MockProvider } from './mockProvider.js';
-
-type HFTask = 'single_message' | 'multi_plan' | 'summary' | 'silence_meaning';
-
-interface HFResponseEnvelope {
-  ok: boolean;
-  result?: unknown;
-  error?: string;
-}
-
-function isPresenceState(value: unknown): value is PresenceState {
-  return value === 'typing' || value === 'thinking' || value === 'organizing' || value === 'waiting';
-}
-
-function isSilenceMeaning(value: unknown): value is SilenceMeaning {
-  return (
-    value === 'crying' ||
-    value === 'organizing_thoughts' ||
-    value === 'emotionally_overwhelmed' ||
-    value === 'away' ||
-    value === 'typing'
-  );
-}
+import type { HFResponseEnvelope, HFTask } from './hfLocalTypes.js';
+import { isSilenceMeaning, normalizeMultiMessagePlan } from './hfLocalValidation.js';
 
 export class HuggingFaceLocalProvider implements LLMProviderAdapter {
   private readonly fallback = new MockProvider();
-
-  private async aiSinglePlanFallback(input: {
-    snapshot: ConversationSnapshot;
-    userText?: string | undefined;
-  }): Promise<MultiMessagePlan | undefined> {
-    try {
-      const text = await this.generateMessage({
-        snapshot: input.snapshot,
-        intent: 'reflection',
-        userText: input.userText
-      });
-      if (!text.trim()) return undefined;
-      return {
-        sendCount: 1,
-        reason: 'hf single-message fallback plan',
-        nextState: 'reflective_pause',
-        messages: [
-          {
-            content: text,
-            delayMs: 550,
-            presenceBeforeSend: 'typing'
-          }
-        ]
-      };
-    } catch {
-      return undefined;
-    }
-  }
 
   private async invoke(task: HFTask, payload: Record<string, unknown>): Promise<unknown> {
     const controller = new AbortController();
@@ -75,14 +19,10 @@ export class HuggingFaceLocalProvider implements LLMProviderAdapter {
         signal: controller.signal
       });
 
-      if (!response.ok) {
-        throw new Error(`HF local endpoint failed: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HF local endpoint failed: ${response.status}`);
 
       const body = (await response.json()) as HFResponseEnvelope;
-      if (!body.ok) {
-        throw new Error(body.error ?? 'HF local endpoint returned failure');
-      }
+      if (!body.ok) throw new Error(body.error ?? 'HF local endpoint returned failure');
       return body.result;
     } finally {
       clearTimeout(timeout);
@@ -98,7 +38,7 @@ export class HuggingFaceLocalProvider implements LLMProviderAdapter {
       const result = await this.invoke('single_message', input as unknown as Record<string, unknown>);
       if (typeof result === 'string' && result.trim()) return result.trim();
     } catch {
-      // fall through to mock provider
+      // Local LLM is optional; mock text keeps the prototype usable offline.
     }
     const fallbackInput = input.userText
       ? { snapshot: input.snapshot, intent: input.intent, userText: input.userText }
@@ -113,52 +53,10 @@ export class HuggingFaceLocalProvider implements LLMProviderAdapter {
   }): Promise<MultiMessagePlan> {
     try {
       const result = await this.invoke('multi_plan', input as unknown as Record<string, unknown>);
-      if (result && typeof result === 'object') {
-        const obj = result as {
-          sendCount?: unknown;
-          reason?: unknown;
-          nextState?: unknown;
-          messages?: unknown;
-        };
-
-        if (
-          typeof obj.sendCount === 'number' &&
-          typeof obj.reason === 'string' &&
-          typeof obj.nextState === 'string' &&
-          Array.isArray(obj.messages)
-        ) {
-          const messages: OutboundMessageInstruction[] = obj.messages
-            .map((item): OutboundMessageInstruction | undefined => {
-              if (!item || typeof item !== 'object') return undefined;
-              const entry = item as { content?: unknown; delayMs?: unknown; presenceBeforeSend?: unknown };
-              if (typeof entry.content !== 'string') return undefined;
-              const delayMs = typeof entry.delayMs === 'number' ? Math.max(0, Math.floor(entry.delayMs)) : 500;
-              const presence = isPresenceState(entry.presenceBeforeSend)
-                ? entry.presenceBeforeSend
-                : undefined;
-              return presence
-                ? {
-                    content: entry.content,
-                    delayMs,
-                    presenceBeforeSend: presence
-                  }
-                : {
-                    content: entry.content,
-                    delayMs
-                  };
-            })
-            .filter((item): item is OutboundMessageInstruction => Boolean(item));
-
-          return {
-            sendCount: Math.max(0, Math.floor(obj.sendCount)),
-            reason: obj.reason,
-            nextState: obj.nextState as MultiMessagePlan['nextState'],
-            messages
-          };
-        }
-      }
+      const plan = normalizeMultiMessagePlan(result);
+      if (plan) return plan;
     } catch {
-      // fall through to mock provider
+      // Fall through to lighter fallbacks.
     }
 
     const aiFallback = await this.aiSinglePlanFallback({
@@ -166,12 +64,9 @@ export class HuggingFaceLocalProvider implements LLMProviderAdapter {
       userText: input.userText
     });
     if (aiFallback) return aiFallback;
-
-    const fallbackInput: {
-      snapshot: ConversationSnapshot;
-      userText?: string;
-      silenceMeaning?: SilenceMeaning;
-    } = { snapshot: input.snapshot };
+    const fallbackInput: { snapshot: ConversationSnapshot; userText?: string; silenceMeaning?: SilenceMeaning } = {
+      snapshot: input.snapshot
+    };
     if (input.userText) fallbackInput.userText = input.userText;
     if (input.silenceMeaning) fallbackInput.silenceMeaning = input.silenceMeaning;
     return this.fallback.generateMultiMessagePlan(fallbackInput);
@@ -193,7 +88,7 @@ export class HuggingFaceLocalProvider implements LLMProviderAdapter {
         }
       }
     } catch {
-      // fall through to mock provider
+      // Mock summary is deterministic enough for local tests.
     }
 
     return this.fallback.summarizeConversationState(input);
@@ -205,13 +100,39 @@ export class HuggingFaceLocalProvider implements LLMProviderAdapter {
   }): Promise<SilenceMeaning> {
     try {
       const result = await this.invoke('silence_meaning', input as unknown as Record<string, unknown>);
-      if (isSilenceMeaning(result)) {
-        return result;
-      }
+      if (isSilenceMeaning(result)) return result;
     } catch {
-      // fall through to mock provider
+      // Silence meaning is advisory; fallback keeps proactive flow moving.
     }
 
     return this.fallback.detectUserSilenceMeaning(input);
+  }
+
+  private async aiSinglePlanFallback(input: {
+    snapshot: ConversationSnapshot;
+    userText?: string | undefined;
+  }): Promise<MultiMessagePlan | undefined> {
+    try {
+      const messageInput: {
+        snapshot: ConversationSnapshot;
+        intent: 'reflection';
+        userText?: string;
+      } = {
+        snapshot: input.snapshot,
+        intent: 'reflection'
+      };
+      if (input.userText) messageInput.userText = input.userText;
+
+      const text = await this.generateMessage(messageInput);
+      if (!text.trim()) return undefined;
+      return {
+        sendCount: 1,
+        reason: 'hf single-message fallback plan',
+        nextState: 'reflective_pause',
+        messages: [{ content: text, delayMs: 550, presenceBeforeSend: 'typing' }]
+      };
+    } catch {
+      return undefined;
+    }
   }
 }

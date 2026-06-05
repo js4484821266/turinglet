@@ -7,7 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 function prepareTempDb(dbPath: string): void {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new Database(dbPath);
-  const migration = fs.readFileSync(path.resolve(process.cwd(), 'database/migrations/001_init.sql'), 'utf8');
+  const migrationPath = path.resolve(process.cwd(), '../database/migrations/001_init.sql');
+  const migration = fs.readFileSync(migrationPath, 'utf8');
   db.exec(migration);
   db.close();
 }
@@ -18,7 +19,7 @@ describe('QR auth', () => {
   });
 
   it('login success and failure by QR payload', async () => {
-    const dbPath = path.resolve(process.cwd(), 'database/test-auth.db');
+    const dbPath = path.resolve(process.cwd(), '../database/test-auth.db');
     if (fs.existsSync(dbPath)) fs.rmSync(dbPath);
     prepareTempDb(dbPath);
 

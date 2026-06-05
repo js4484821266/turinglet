@@ -1,0 +1,88 @@
+:root {
+  --bg-a: #f2f0ea;
+  --bg-b: #d3c8b5;
+  --ink: #1f2a35;
+  --accent: #005b5b;
+  --accent-soft: #4f7c6a;
+  --card: rgba(255, 255, 255, 0.82);
+  --mine: #005b5b;
+  --theirs: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: "Space Grotesk", "Noto Sans KR", sans-serif;
+  background: radial-gradient(circle at 20% 20%, #fff8e8 0%, transparent 30%),
+    radial-gradient(circle at 70% 70%, #c7e2d7 0%, transparent 35%),
+    linear-gradient(130deg, var(--bg-a), var(--bg-b));
+}
+
+.page {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.top-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.card {
+  backdrop-filter: blur(8px);
+  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.14);
+}
+
+.field {
+  width: 100%;
+  border: 1px solid #c0c8cc;
+  border-radius: 12px;
+  padding: 10px;
+  margin-top: 10px;
+  font: inherit;
+  min-height: 42px;
+}
+
+textarea.field {
+  min-height: 90px;
+}
+
+.btn {
+  margin-top: 10px;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font: inherit;
+  background: #e4ece7;
+}
+
+.btn.primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn.ghost {
+  background: transparent;
+  border: 1px dashed #90a1a7;
+}
+
+.error {
+  color: #922;
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 12px;
+  }
+}

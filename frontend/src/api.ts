@@ -1,7 +1,11 @@
 import axios from 'axios';
 
 const configuredBackendOrigin = import.meta.env.VITE_BACKEND_ORIGIN?.trim();
-const backendOrigin = configuredBackendOrigin || `${window.location.protocol}//${window.location.hostname}:4000`;
+
+// Keep the backend origin in one place. Mobile/LAN access works because the
+// default mirrors the browser host and only swaps the port to the API server.
+export const backendOrigin =
+  configuredBackendOrigin || `${window.location.protocol}//${window.location.hostname}:4000`;
 
 export const api = axios.create({
   baseURL: `${backendOrigin}/api`
