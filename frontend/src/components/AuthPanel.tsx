@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { BrowserQRCodeReader } from '@zxing/browser';
 import { api } from '../api';
 import { useAppStore } from '../store';
@@ -14,7 +14,6 @@ export function AuthPanel() {
   const [displayName, setDisplayName] = useState('');
   const [qrInput, setQrInput] = useState('');
   const [error, setError] = useState<string | undefined>();
-  const videoRef = useRef<HTMLVideoElement>(null);
   const codeReader = useMemo(() => new BrowserQRCodeReader(), []);
 
   const register = async () => {
@@ -39,18 +38,6 @@ export function AuthPanel() {
       setAuth({ sessionId: res.data.sessionId, userId: res.data.userId });
     } catch {
       setError('로그인 실패: QR 형식/토큰을 확인해주세요.');
-    }
-  };
-
-  const scanWithCamera = async () => {
-    if (!videoRef.current) return;
-    setError(undefined);
-    try {
-      const result = await codeReader.decodeOnceFromVideoDevice(undefined, videoRef.current);
-      setQrInput(result.getText());
-      await login(result.getText());
-    } catch {
-      setError('카메라 스캔 실패. 업로드 방식도 시도해주세요.');
     }
   };
 
@@ -104,10 +91,6 @@ export function AuthPanel() {
         </button>
 
         <div className="scan-tools">
-          <video ref={videoRef} className="video" muted />
-          <button className="btn" onClick={scanWithCamera}>
-            카메라로 스캔
-          </button>
           <label className="btn ghost">
             이미지 업로드로 스캔
             <input

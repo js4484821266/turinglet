@@ -155,7 +155,7 @@ flowchart LR
     RegisterAPI --> UserTable[users]
     RegisterAPI --> TokenTable[identity_tokens token_hash]
     RegisterAPI --> QR[qrPayload qrDataUrl recoveryCode]
-    QR --> LoginInput[QR 붙여넣기 또는 스캔]
+    QR --> LoginInput[QR 붙여넣기 또는 이미지 업로드 스캔]
     LoginInput --> LoginAPI["/api/auth/login"]
     LoginAPI --> SessionTable[sessions]
     SessionTable --> SessionId[x-session-id]
@@ -395,7 +395,7 @@ graph TD
 | [`resolveSqlitePath`](database/src/env.ts) | 함수 | [`database/src/env.ts`](database/src/env.ts) | repo root 기준 SQLite 경로를 계산한다. | [`database/src/migrate.ts`](database/src/migrate.ts) |
 | [`migrate.ts`](database/src/migrate.ts) | 스크립트 | [`database/src/migrate.ts`](database/src/migrate.ts) | SQL migration 파일을 SQLite DB에 적용한다. | [`database/migrations/001_init.sql`](database/migrations/001_init.sql) |
 | [`App`](frontend/src/App.tsx) | component | [`frontend/src/App.tsx`](frontend/src/App.tsx) | chat/admin view를 전환하고 인증 여부에 따라 화면을 고른다. | [`useAppStore`](frontend/src/store.ts) |
-| [`AuthPanel`](frontend/src/components/AuthPanel.tsx) | component | [`frontend/src/components/AuthPanel.tsx`](frontend/src/components/AuthPanel.tsx) | QR 가입, QR 로그인, 카메라/이미지 QR 스캔을 처리한다. | [`api`](frontend/src/api.ts) |
+| [`AuthPanel`](frontend/src/components/AuthPanel.tsx) | component | [`frontend/src/components/AuthPanel.tsx`](frontend/src/components/AuthPanel.tsx) | QR 가입, QR 로그인, QR payload 붙여넣기와 이미지 업로드 스캔을 처리한다. | [`api`](frontend/src/api.ts) |
 | [`ChatPanel`](frontend/src/components/ChatPanel.tsx) | component | [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx) | 메시지 조회, socket 구독, typing 전송, 메시지 전송을 처리한다. | [`scheduleReactivePlan`](backend/src/runtime/reactivePlanner.ts) |
 | [`AdminPanel`](frontend/src/components/AdminPanel.tsx) | component | [`frontend/src/components/AdminPanel.tsx`](frontend/src/components/AdminPanel.tsx) | 관리자 overview와 세션 메시지를 표시한다. | [`/api/admin/overview`](backend/src/routes/adminRoutes.ts) |
 | [`useAppStore`](frontend/src/store.ts) | hook/store | [`frontend/src/store.ts`](frontend/src/store.ts) | session, QR, messages, presence 상태를 저장한다. | [`ChatPanel`](frontend/src/components/ChatPanel.tsx) |

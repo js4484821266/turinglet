@@ -27,10 +27,3 @@
 .scan-tools {
   margin-top: 14px;
 }
-
-.video {
-  width: 100%;
-  max-height: 180px;
-  border-radius: 12px;
-  background: #000;
-}
