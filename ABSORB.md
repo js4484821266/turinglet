@@ -41,7 +41,7 @@ Turinglet은 사용자의 메시지 내용뿐 아니라 타이핑 상태, 침묵
 | [`database`](database) | 코드/설정 | SQLite migration, seed, DB 경로 해석 유틸이 있다. | High | 로컬 DB 초기화 담당. |
 | [`database/migrations/001_init.sql`](database/migrations/001_init.sql) | 데이터 | users, sessions, messages, proactive_events 등 테이블을 만든다. | High | DB 스키마 원본이다. |
 | [`local-llm`](local-llm) | 코드 | FastAPI 기반 로컬 LLM 서버를 제공한다. | Medium | `LLM_PROVIDER=hf-local`일 때 사용. |
-| [`local-llm/server.py`](local-llm/server.py) | 코드 | `/health`, `/v1/generate`를 제공하고 GGUF 모델을 로드한다. | Medium | 모델 다운로드/추론 흐름이 있다. |
+| [`local-llm/server.py`](local-llm/server.py) | 코드 | `/health`, `/v1/generate`를 제공하고 GGUF 모델을 로드한다. | Medium | 명시적 로컬 모델 경로를 우선하고, 다운로드는 opt-in이다. |
 | [`prompt-engineering`](prompt-engineering) | 문서 | 시스템/침묵/안전/rapport/proactive 프롬프트 설계 문서. | Medium | 현재 코드에서 직접 import되는 것은 확인되지 않았다. |
 | [`screenshots`](screenshots) | 이미지 | README 또는 수동 검증용으로 보이는 앱 화면 이미지. | Low | 코드에서 참조는 확인되지 않았다. |
 | [`test-cases`](test-cases) | 이미지 | `.gitignore` 대상 수동 테스트 이미지 모음. | Low | 로컬에는 있으나 git 추적 대상은 아니다. |
@@ -76,7 +76,6 @@ Turinglet은 사용자의 메시지 내용뿐 아니라 타이핑 상태, 침묵
 | [`backend/database/test-auth.db`](backend/database/test-auth.db) | 데이터 | [`backend/tests/auth-qr.test.ts`](backend/tests/auth-qr.test.ts) | QR 테스트 임시 DB, `.gitignore` 대상 | 테스트 DB가 사라지지만 재생성 가능하다. |
 | [`database/database/local-dev.db`](database/database/local-dev.db) | 데이터 | 로컬 실행 산출물 | 경로 문제로 생긴 database 하위 DB로 보임 | 해당 데이터가 사라진다. 정확한 생성 경로는 확인 필요. |
 | [`local-llm/requirements.txt`](local-llm/requirements.txt) | 설정 | [`local-llm/server.py`](local-llm/server.py) | Python LLM 서버 의존성 목록 | LLM 서버 설치 방법을 잃는다. |
-| [`local-llm/__pycache__/server.cpython-313.pyc`](local-llm/__pycache__/server.cpython-313.pyc) | 빌드 산출물 | Python 런타임 | 컴파일된 Python 캐시 | 소스 실행에는 큰 문제 없고 재생성 가능하다. 추적 대상인 점은 개선 필요. |
 | [`prompt-engineering/system-prompt.md`](prompt-engineering/system-prompt.md) | 문서 | 프롬프트 설계 자료 | 상담형 assistant 시스템 원칙 | 설계 의도를 잃는다. 현재 코드 직접 참조는 확인 필요. |
 | [`prompt-engineering/silence-interpretation-prompt.md`](prompt-engineering/silence-interpretation-prompt.md) | 문서 | 프롬프트 설계 자료 | 침묵 의미 후보와 operator action 정의 | proactive 설계 근거가 약해진다. 현재 코드 직접 참조는 확인 필요. |
 | [`prompt-engineering/safety-sensitive-response-prompt.md`](prompt-engineering/safety-sensitive-response-prompt.md) | 문서 | 프롬프트 설계 자료 | 안전 민감 응답 원칙 | 안전 대응 설계 자료가 사라진다. 현재 코드 직접 참조는 확인 필요. |
@@ -231,8 +230,8 @@ flowchart LR
 
 - backend caller: [`HuggingFaceLocalProvider.invoke`](backend/src/adapters/hfLocalProvider.ts)
 - local server: [`local-llm/server.py`](local-llm/server.py)
-- model 기본값: `bartowski/Qwen2.5-1.5B-Instruct-GGUF`와 `Qwen2.5-1.5B-Instruct-Q4_K_M.gguf`는 [`local-llm/server.py`](local-llm/server.py)에 하드코딩되어 있고 `HF_MODEL_REPO`, `HF_MODEL_FILE`로 override 가능하다.
-- 모델 파일은 저장소 안에서 확인되지 않았다. Hugging Face cache 위치는 확인 필요.
+- model 경로: [`local-llm/server.py`](local-llm/server.py)는 `HF_MODEL_PATH`가 가리키는 로컬 GGUF 파일을 먼저 사용한다.
+- 명시적 다운로드: `HF_ALLOW_MODEL_DOWNLOAD=true`일 때만 `HF_MODEL_REPO`, `HF_MODEL_FILE`을 사용해 Hugging Face에서 받으며, cache 기본 위치는 repo 내부 `./local-llm/models`다.
 
 ## 7. 모듈 의존 관계
 
@@ -485,15 +484,18 @@ graph TD
 | `PROACTIVE_POLL_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | proactive loop interval | `5000` | 선제 발화 판단 빈도가 바뀐다. |
 | `PROACTIVE_MIN_SILENCE_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | 선제 발화 최소 침묵 시간 | `120000` | 낮추면 더 자주 먼저 말한다. |
 | `PROACTIVE_COOLDOWN_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | 선제 발화 쿨다운 | `240000` | 낮추면 반복 check-in이 잦아진다. |
-| `USER_CONTINUATION_GRACE_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | 사용자 메시지 후 첫 reactive 판단 대기 시간 | `.env.example`은 `1800`, code fallback은 `600` | 짧으면 응답이 빨라지고, 길면 이어 말하기를 더 기다린다. |
-| `REACTIVE_RESPONSE_MAX_WAIT_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | continuation으로 응답을 미룰 수 있는 최대 시간 | `.env.example`은 `30000`, code fallback은 `20000` | 길면 응답 지연이 늘 수 있다. |
+| `USER_CONTINUATION_GRACE_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | 사용자 메시지 후 첫 reactive 판단 대기 시간 | `600` | 짧으면 응답이 빨라지고, 길면 이어 말하기를 더 기다린다. |
+| `REACTIVE_RESPONSE_MAX_WAIT_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | continuation으로 응답을 미룰 수 있는 최대 시간 | `20000` | 길면 응답 지연이 늘 수 있다. |
 | `MOCK_PROVIDER` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | mock provider 사용 여부에 영향 | `true` unless `false` | `false`면 providerMode fallback이 `hf-local`로 간다. |
 | `LLM_PROVIDER` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | `mock` 또는 `hf-local` provider 선택 | `mock` | 로컬 LLM 사용 여부가 바뀐다. |
 | `HF_LOCAL_URL` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | local LLM endpoint origin | `http://127.0.0.1:8010` | HF provider 호출 대상이 바뀐다. |
-| `HF_LOCAL_TIMEOUT_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | HF provider timeout | `.env.example`은 `40000`, code fallback은 `30000` | 길면 느린 모델을 더 기다리고, 짧으면 fallback이 빨라진다. |
+| `HF_LOCAL_TIMEOUT_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | HF provider timeout | `30000` | 길면 느린 모델을 더 기다리고, 짧으면 fallback이 빨라진다. |
 | `VITE_BACKEND_ORIGIN` | [`frontend/src/api.ts`](frontend/src/api.ts), [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx) | 프론트에서 backend origin override | 미설정 시 현재 host의 `:4000` | LAN/배포 환경에서 API 주소를 바꾼다. |
-| `HF_MODEL_REPO` | [`local-llm/server.py`](local-llm/server.py) | Hugging Face model repo | `bartowski/Qwen2.5-1.5B-Instruct-GGUF` | 다른 GGUF 모델을 내려받는다. |
-| `HF_MODEL_FILE` | [`local-llm/server.py`](local-llm/server.py) | Hugging Face model file | `Qwen2.5-1.5B-Instruct-Q4_K_M.gguf` | 모델 크기/성능/메모리 요구량이 바뀐다. |
+| `HF_MODEL_PATH` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | 로컬 GGUF 모델 파일 경로 | 빈 값 | 설정하면 자동 다운로드 없이 해당 파일을 로드한다. |
+| `HF_ALLOW_MODEL_DOWNLOAD` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face 모델 다운로드 허용 여부 | `false` | `true`일 때만 네트워크 다운로드를 시도한다. |
+| `HF_MODEL_CACHE_DIR` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | 다운로드 모델 cache 위치 | `./local-llm/models` | repo 내부 경로를 기본값으로 사용한다. |
+| `HF_MODEL_REPO` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face model repo | `bartowski/Qwen2.5-1.5B-Instruct-GGUF` | 다운로드 opt-in 시 받을 GGUF repo가 바뀐다. |
+| `HF_MODEL_FILE` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face model file | `Qwen2.5-1.5B-Instruct-Q4_K_M.gguf` | 모델 크기/성능/메모리 요구량이 바뀐다. |
 | `HF_LOCAL_HOST` | [`local-llm/server.py`](local-llm/server.py) | local LLM bind host | `127.0.0.1` | 외부 기기 접근 가능성이 바뀐다. |
 | `HF_LOCAL_PORT` | [`local-llm/server.py`](local-llm/server.py) | local LLM port | `8010` | backend `HF_LOCAL_URL`도 맞춰야 한다. |
 | `BURST_PRESENCE_SEQUENCE` | [`backend/src/adapters/mockProvider.ts`](backend/src/adapters/mockProvider.ts) | multi-message 전송 전 presence 순서 | `typing`, `thinking`, `organizing` | assistant 상태 표시 리듬이 바뀐다. |
@@ -512,7 +514,7 @@ graph TD
 - Node.js와 npm: 정확한 최소 버전은 코드에서 확인 필요.
 - Python venv: [`local-llm/requirements.txt`](local-llm/requirements.txt)에 필요한 Python 패키지가 정의되어 있다. 정확한 최소 Python 버전은 확인 필요.
 - SQLite: [`better-sqlite3`](backend/package.json)을 사용한다.
-- 로컬 LLM을 쓰려면 Hugging Face 모델 다운로드가 필요하다. 최초 실행 시 네트워크와 디스크 용량이 필요하다.
+- 로컬 LLM을 쓰려면 로컬 GGUF 모델 경로(`HF_MODEL_PATH`)가 필요하다. Hugging Face 다운로드는 `HF_ALLOW_MODEL_DOWNLOAD=true`를 명시한 경우에만 시도한다.
 
 ### 설치 명령
 
@@ -535,7 +537,7 @@ pip install -r local-llm/requirements.txt
 Copy-Item .env.example .env -Force
 ```
 
-mock provider만 쓰려면 [`.env.example`](.env.example)의 `LLM_PROVIDER=mock`, `MOCK_PROVIDER=true` 흐름을 사용한다. 로컬 LLM을 쓰려면 `LLM_PROVIDER=hf-local`, `HF_LOCAL_URL=http://127.0.0.1:8010`이 필요하다.
+mock provider만 쓰려면 [`.env.example`](.env.example)의 `LLM_PROVIDER=mock`, `MOCK_PROVIDER=true` 흐름을 사용한다. 로컬 LLM을 쓰려면 `LLM_PROVIDER=hf-local`, `HF_LOCAL_URL=http://127.0.0.1:8010`, 그리고 `HF_MODEL_PATH` 또는 `HF_ALLOW_MODEL_DOWNLOAD=true`가 필요하다.
 
 ### DB migration
 
@@ -559,6 +561,19 @@ npm run dev
 - backend: `http://localhost:4000`
 
 ### 로컬 LLM 서버 실행
+
+이미 받은 GGUF 모델을 쓰는 경우:
+
+```env
+HF_MODEL_PATH=C:/models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
+```
+
+명시적으로 다운로드를 허용하는 경우:
+
+```env
+HF_ALLOW_MODEL_DOWNLOAD=true
+HF_MODEL_CACHE_DIR=./local-llm/models
+```
 
 ```powershell
 npm run llm:server
@@ -649,17 +664,13 @@ GitHub Copilot과 Codex를 활용해 구현 속도를 높였고, 구조 이해, 
 - [`database/migrations/001_init.sql`](database/migrations/001_init.sql)에 `safety_flags` 테이블이 있지만, 현재 코드에서 insert/query 사용은 확인되지 않았다.
 - [`backend/src/runtime/reactivePlanner.ts`](backend/src/runtime/reactivePlanner.ts)의 timer 기반 plan은 메모리 안에만 있다. 서버 재시작 시 pending assistant message와 reactive plan은 사라진다.
 - [`queuePlanMessages`](backend/src/runtime/messageQueue.ts)는 send 직전에 typing이면 message send를 skip한다. 그런데 proactive event는 queue 직후 기록되어 실제 발송 실패와 기록이 어긋날 수 있다.
-- [`local-llm/server.py`](local-llm/server.py)는 import 시점에 모델 다운로드와 로드를 시도한다. 모델 다운로드 실패 시 서버가 시작되지 않는다.
+- [`local-llm/server.py`](local-llm/server.py)는 시작 시 모델을 로드하므로 `HF_MODEL_PATH`가 없고 다운로드 opt-in도 꺼져 있으면 서버가 시작되지 않는다.
 - [`backend/src/rateLimit.ts`](backend/src/rateLimit.ts)는 in-memory IP bucket이다. 프로세스 재시작 시 초기화되고, 여러 서버 인스턴스에서는 공유되지 않는다.
-- [`local-llm/__pycache__/server.cpython-313.pyc`](local-llm/__pycache__/server.cpython-313.pyc)가 git 추적 대상이다. 빌드 산출물은 소스와 분리하는 편이 좋다.
-- [`.env.example`](.env.example)의 일부 기본값과 [`backend/src/config.ts`](backend/src/config.ts)의 fallback 값이 다르다. 예를 들어 `USER_CONTINUATION_GRACE_MS`, `REACTIVE_RESPONSE_MAX_WAIT_MS`, `HF_LOCAL_TIMEOUT_MS`가 다르다.
 
 ## 17. 다음 개선 과제
 
 | 난이도 | 개선 과제 | 기대 효과 | 관련 파일 |
 | --- | ----- | ----- | ----- |
-| Easy | [`.env.example`](.env.example)과 [`backend/src/config.ts`](backend/src/config.ts)의 fallback 값 정렬 | 실행 환경별 동작 차이를 줄인다. | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) |
-| Easy | [`local-llm/__pycache__/server.cpython-313.pyc`](local-llm/__pycache__/server.cpython-313.pyc) 추적 제거 | 저장소가 소스 중심으로 깨끗해진다. | [`.gitignore`](.gitignore), [`local-llm`](local-llm) |
 | Easy | prompt 문서가 코드에 반영되는지 표시 | 설계 prompt와 실행 prompt의 차이를 줄인다. | [`prompt-engineering`](prompt-engineering), [`local-llm/server.py`](local-llm/server.py) |
 | Medium | 관리자 API에 간단한 인증 추가 | 로컬 외 환경에서 대화 데이터 노출 위험을 줄인다. | [`backend/src/routes/adminRoutes.ts`](backend/src/routes/adminRoutes.ts), [`frontend/src/components/AdminPanel.tsx`](frontend/src/components/AdminPanel.tsx) |
 | Medium | proactive event에 실제 sent/skip 결과 기록 | 관리자 대시보드의 관찰 정확도가 올라간다. | [`queuePlanMessages`](backend/src/runtime/messageQueue.ts), [`recordProactiveEvent`](backend/src/db/store.ts) |

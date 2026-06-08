@@ -91,6 +91,24 @@ python -m venv .venv-llm
 .\.venv-llm\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r local-llm/requirements.txt
+```
+
+로컬 LLM 서버는 모델 파일을 자동 다운로드하지 않습니다. 이미 받은 GGUF 모델이 있으면 `.env`에 경로를 지정합니다.
+
+```env
+HF_MODEL_PATH=C:/models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
+```
+
+명시적으로 Hugging Face 다운로드를 허용하려면 아래 값을 `.env`에 설정합니다. 기본 cache 위치는 repo 내부 `local-llm/models`입니다.
+
+```env
+HF_ALLOW_MODEL_DOWNLOAD=true
+HF_MODEL_CACHE_DIR=./local-llm/models
+HF_MODEL_REPO=bartowski/Qwen2.5-1.5B-Instruct-GGUF
+HF_MODEL_FILE=Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
+```
+
+```powershell
 npm run llm:server
 ```
 

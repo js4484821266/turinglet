@@ -3,6 +3,10 @@ dist/
 .env
 .env.*
 !.env.example
+.venv-llm/
+__pycache__/
+*.py[cod]
+local-llm/models/
 *.db
 *.db-shm
 *.db-wal

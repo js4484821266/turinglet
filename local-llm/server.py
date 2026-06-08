@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import logging
+from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import FastAPI
@@ -16,6 +17,44 @@ logging.basicConfig(
     format='%(asctime)s [%(levelname)s] %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _load_repo_env() -> None:
+    """Load simple KEY=VALUE pairs from the repo .env without extra dependencies."""
+    env_path = REPO_ROOT / ".env"
+    if not env_path.exists():
+        return
+
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key or key in os.environ:
+            continue
+        if (value.startswith('"') and value.endswith('"')) or (
+            value.startswith("'") and value.endswith("'")
+        ):
+            value = value[1:-1]
+        os.environ[key] = value
+
+
+def _truthy(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _repo_relative_path(raw_path: str) -> Path:
+    candidate = Path(raw_path).expanduser()
+    if candidate.is_absolute():
+        return candidate.resolve()
+    return (REPO_ROOT / candidate).resolve()
+
+
+_load_repo_env()
 
 
 TaskType = Literal["single_message", "multi_plan", "summary", "silence_meaning"]
@@ -35,22 +74,54 @@ class GenerateResponse(BaseModel):
 app = FastAPI(title="Turinglet Local LLM")
 
 
-# Lightweight quantized GGUF model — much lower CPU/memory than full-precision torch.
-# Override via HF_MODEL_REPO / HF_MODEL_FILE env vars.
+# Prefer an explicit local GGUF path. Downloading is opt-in so server startup does
+# not write model files to a user cache or the repo without a clear setting.
+MODEL_PATH = os.getenv("HF_MODEL_PATH", "").strip()
 MODEL_REPO = os.getenv("HF_MODEL_REPO", "bartowski/Qwen2.5-1.5B-Instruct-GGUF")
 MODEL_FILE = os.getenv("HF_MODEL_FILE", "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf")
+ALLOW_MODEL_DOWNLOAD = _truthy(os.getenv("HF_ALLOW_MODEL_DOWNLOAD"))
+MODEL_CACHE_DIR = _repo_relative_path(os.getenv("HF_MODEL_CACHE_DIR", "./local-llm/models"))
 HOST = os.getenv("HF_LOCAL_HOST", "127.0.0.1")
 PORT = int(os.getenv("HF_LOCAL_PORT", "8010"))
 
-try:
-    _model_path = hf_hub_download(repo_id=MODEL_REPO, filename=MODEL_FILE)
-except Exception as exc:
-    raise RuntimeError(
-        f"Failed to download model '{MODEL_FILE}' from '{MODEL_REPO}'. "
-        "Check your internet connection or set HF_MODEL_REPO / HF_MODEL_FILE env vars."
-    ) from exc
+
+def _resolve_model_path() -> Path:
+    if MODEL_PATH:
+        local_path = _repo_relative_path(MODEL_PATH)
+        if not local_path.exists():
+            raise FileNotFoundError(
+                f"HF_MODEL_PATH points to a missing file: {local_path}. "
+                "Set it to an existing local GGUF model path."
+            )
+        return local_path
+
+    if not ALLOW_MODEL_DOWNLOAD:
+        raise RuntimeError(
+            "No local model file configured. Set HF_MODEL_PATH to an existing GGUF file. "
+            "To explicitly allow a Hugging Face download, set HF_ALLOW_MODEL_DOWNLOAD=true; "
+            f"the cache directory will be {MODEL_CACHE_DIR}."
+        )
+
+    MODEL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        return Path(
+            hf_hub_download(
+                repo_id=MODEL_REPO,
+                filename=MODEL_FILE,
+                cache_dir=str(MODEL_CACHE_DIR),
+            )
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to download model '{MODEL_FILE}' from '{MODEL_REPO}'. "
+            "Check your internet connection, set HF_MODEL_PATH to a local file, "
+            "or adjust HF_MODEL_REPO / HF_MODEL_FILE."
+        ) from exc
+
+
+_model_path = _resolve_model_path()
 llm = Llama(
-    model_path=_model_path,
+    model_path=str(_model_path),
     n_ctx=2048,
     n_threads=max(1, (os.cpu_count() or 4) // 2),
     verbose=False,
@@ -96,7 +167,7 @@ def _extract_json(text: str) -> Dict[str, Any]:
 
 @app.get("/health")
 def health() -> Dict[str, Any]:
-    return {"ok": True, "model": f"{MODEL_REPO}/{MODEL_FILE}"}
+    return {"ok": True, "model": str(_model_path)}
 
 
 @app.post("/v1/generate", response_model=GenerateResponse)
@@ -198,7 +269,12 @@ def generate(req: GenerateRequest) -> GenerateResponse:
         return GenerateResponse(ok=False, error=str(exc))
 
 
-if __name__ == "__main__":
+def main() -> int:
     logger.info(f"Starting LLM server on {HOST}:{PORT}")
-    logger.info(f"Model: {MODEL_REPO}/{MODEL_FILE}")
+    logger.info(f"Model path: {_model_path}")
     uvicorn.run(app, host=HOST, port=PORT, reload=False, log_level="info")
+    return 0
+
+
+if __name__ == "__main__":
+    main()
