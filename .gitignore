@@ -13,3 +13,4 @@ local-llm/models/
 coverage/
 frontend/.vite/
 test-cases/
+.prompts.txt
