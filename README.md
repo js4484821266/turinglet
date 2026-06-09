@@ -84,6 +84,19 @@ LLM_PROVIDER=hf-local
 HF_LOCAL_URL=http://127.0.0.1:8010
 ```
 
+관리자 대시보드를 쓰려면 `.env`에 관리자 ID와 비밀번호의 SHA-256 hex 값을 넣습니다. 실제 비밀번호 원문은 저장하지 않습니다.
+
+```env
+ACHRAI_ID=admin
+ACHRAI_PW_SHA2_256=비밀번호_sha256_hex값
+```
+
+비밀번호 해시는 Node.js로 만들 수 있습니다.
+
+```powershell
+node -e "const crypto=require('crypto'); console.log(crypto.createHash('sha256').update('여기에_비밀번호').digest('hex'))"
+```
+
 ### 3) 로컬 LLM 서버 실행
 
 ```powershell
@@ -112,6 +125,18 @@ HF_MODEL_FILE=Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
 npm run llm:server
 ```
 
+서버가 예외나 모델 문제로 종료될 때 자동 재시작까지 보고 싶으면 PowerShell 스크립트를 사용할 수 있습니다.
+
+```powershell
+.\run-llm-server.ps1
+```
+
+재시작 횟수를 제한하려면 다음처럼 실행합니다.
+
+```powershell
+.\run-llm-server.ps1 -MaxRestarts 5
+```
+
 정상 동작 확인
 
 ```powershell
@@ -129,6 +154,13 @@ npm run dev
 
 - frontend: http://localhost:5173
 - backend: http://localhost:4000
+
+관리자 대시보드 주소
+
+- PC: http://localhost:5173/achrai/
+- 스마트폰: http://PC의_사설IP:5173/achrai/
+
+관리자 화면은 일반 첫 화면에 버튼으로 노출되지 않습니다. `/achrai/`로 직접 접속해 ID와 비밀번호를 입력하면, 브라우저가 비밀번호를 SHA-256으로 바꾼 뒤 서버의 `.env` 값과 대조합니다. 로그인 토큰은 `sessionStorage`에 저장되므로 탭을 닫으면 다시 로그인해야 합니다.
 
 ### 5) 스마트폰에서 접속 (같은 Wi-Fi)
 

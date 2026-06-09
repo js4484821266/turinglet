@@ -29,7 +29,7 @@ Turinglet은 사용자의 메시지 내용뿐 아니라 타이핑 상태, 침묵
 | [`backend/src/adapters`](backend/src/adapters) | 코드 | mock provider와 로컬 HF provider를 선택하고 실행한다. | High | 메시지 생성과 fallback이 여기 있다. |
 | [`backend/src/db`](backend/src/db) | 코드 | SQLite/PostgreSQL store 구현과 snapshot 생성 로직이 있다. | High | 대화 상태의 원천이다. |
 | [`frontend`](frontend) | 코드 | React/Vite 채팅 UI, QR 가입/로그인, 관리자 대시보드를 담당한다. | High | 사용자 입력이 시작되는 곳이다. |
-| [`frontend/src/App.tsx`](frontend/src/App.tsx) | 코드 | chat/admin view를 고르는 작은 최상위 컴포넌트다. | High | 화면 진입 흐름만 본다. |
+| [`frontend/src/App.tsx`](frontend/src/App.tsx) | 코드 | 일반 경로에서는 채팅/QR 인증 화면을, `/achrai/`에서는 관리자 화면을 고르는 최상위 컴포넌트다. | High | 화면 진입 흐름만 본다. |
 | [`frontend/src/components`](frontend/src/components) | 코드 | [`AuthPanel`](frontend/src/components/AuthPanel.tsx), [`ChatPanel`](frontend/src/components/ChatPanel.tsx), [`AdminPanel`](frontend/src/components/AdminPanel.tsx)을 분리해 둔 UI 컴포넌트 폴더다. | High | 실제 프론트 기능은 여기서 읽는다. |
 | [`frontend/src/styles`](frontend/src/styles) | 코드 | base/auth/chat/admin CSS를 기능별로 나눈다. | Medium | UI 스타일 읽기용. |
 | [`frontend/src/api.ts`](frontend/src/api.ts) | 코드 | backend origin과 API 타입을 정의한다. | Medium | LAN 접속 시 host 기반 backend 주소를 만든다. |
@@ -260,7 +260,7 @@ graph TD
 - [`backend/src/app.ts`](backend/src/app.ts)는 [`@turinglet/scheduler`](scheduler/src/index.ts), [`@turinglet/shared`](shared/src/index.ts), [`createProvider`](backend/src/adapters/index.ts), [`createStore`](backend/src/db/index.ts)를 모두 사용한다.
 - [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts)는 실패 시 [`MockProvider`](backend/src/adapters/mockProvider.ts)로 fallback한다.
 - [`backend/src/db/store.ts`](backend/src/db/store.ts)는 [`@turinglet/database`](database/src/index.ts)의 [`resolveSqlitePath`](database/src/env.ts)를 사용하지만, 자체적으로도 repo root 탐색 로직을 갖고 있다.
-- [`frontend/src/App.tsx`](frontend/src/App.tsx)는 [`frontend/src/api.ts`](frontend/src/api.ts), [`frontend/src/store.ts`](frontend/src/store.ts), `socket.io-client`, `@zxing/browser`에 의존한다.
+- [`frontend/src/App.tsx`](frontend/src/App.tsx)는 URL path와 [`frontend/src/store.ts`](frontend/src/store.ts)의 session 상태를 기준으로 일반 채팅 화면과 `/achrai/` 관리자 화면을 분기한다.
 - [`local-llm/server.py`](local-llm/server.py)는 TypeScript 패키지에 직접 import되지 않고 HTTP endpoint로만 연결된다.
 
 ## 8. 핵심 기능별 구조
@@ -276,7 +276,7 @@ graph TD
 - 입력: `displayName`, `enableRecoveryCode`, `qrPayload`, `recoveryCode`
 - 처리: public id와 recovery code를 생성하고 token은 hash로 저장한다. QR payload는 `TLQR1:` prefix와 base64url JSON으로 만든다.
 - 출력: `qrPayload`, `qrDataUrl`, `recoveryCode`, `sessionId`, `userId`
-- 예외 또는 주의점: `/api/auth/login`은 QR payload 변조 시 `Malformed or forged QR payload`를 반환한다. 관리자 API에는 인증이 없다.
+- 예외 또는 주의점: `/api/auth/login`은 QR payload 변조 시 `Malformed or forged QR payload`를 반환한다. 관리자 로그인은 별도 `/achrai/` 경로와 `/api/admin/login` 토큰 흐름을 사용한다.
 - 내가 면접에서 설명해야 할 핵심: “QR에는 실제 DB id가 아니라 긴 public token payload가 들어가고, 서버는 token hash로 사용자를 찾은 뒤 최신 세션을 재사용합니다.”
 
 ### 사용자 메시지 reactive 응답
@@ -357,10 +357,10 @@ graph TD
 - 주요 클래스: 확인 필요
 - 주요 함수 또는 메서드: [`AdminPanel`](frontend/src/components/AdminPanel.tsx), [`loadOverview`](frontend/src/components/AdminPanel.tsx), [`loadSessionMessages`](frontend/src/components/AdminPanel.tsx), [`listUsers`](backend/src/db/store.ts), [`listSessions`](backend/src/db/store.ts), [`listMessagesForSession`](backend/src/db/store.ts), [`listProactiveEvents`](backend/src/db/store.ts)
 - 주요 변수 또는 상수: [`AdminOverview`](frontend/src/components/AdminPanel.tsx), [`AdminUserRow`](frontend/src/api.ts), [`AdminSessionRow`](frontend/src/api.ts), [`AdminProactiveEventRow`](frontend/src/api.ts)
-- 입력: admin view 선택, session id
-- 처리: `/api/admin/overview`와 `/api/admin/sessions/:sessionId/messages`를 호출한다.
+- 입력: `/achrai/` 직접 접속, 관리자 ID, 비밀번호, session id
+- 처리: 프론트가 비밀번호를 SHA-256 hex로 변환해 `/api/admin/login`에 보내고, 성공 시 받은 Bearer token으로 `/api/admin/overview`와 `/api/admin/sessions/:sessionId/messages`를 호출한다.
 - 출력: 사용자/세션/메시지/선제 이벤트 테이블
-- 예외 또는 주의점: admin endpoint에 인증/권한 검사가 없다.
+- 예외 또는 주의점: 관리자 ID와 SHA-256 해시는 [`.env`](.env)에 `ACHRAI_ID`, `ACHRAI_PW_SHA2_256`으로 설정해야 한다. 토큰은 서버 메모리와 브라우저 `sessionStorage`에만 있으므로 서버 재시작이나 탭 종료 시 다시 로그인해야 한다.
 - 내가 면접에서 설명해야 할 핵심: “운영용 완성 기능이라기보다, 프로토타입의 대화 상태와 선제 발화 이벤트를 눈으로 확인하기 위한 관찰 도구입니다.”
 
 ## 9. 핵심 식별자 사전
@@ -394,10 +394,10 @@ graph TD
 | [`config`](backend/src/config.ts) | 상수 | [`backend/src/config.ts`](backend/src/config.ts) | 환경 변수와 fallback을 모은 runtime 설정이다. | [`.env.example`](.env.example) |
 | [`resolveSqlitePath`](database/src/env.ts) | 함수 | [`database/src/env.ts`](database/src/env.ts) | repo root 기준 SQLite 경로를 계산한다. | [`database/src/migrate.ts`](database/src/migrate.ts) |
 | [`migrate.ts`](database/src/migrate.ts) | 스크립트 | [`database/src/migrate.ts`](database/src/migrate.ts) | SQL migration 파일을 SQLite DB에 적용한다. | [`database/migrations/001_init.sql`](database/migrations/001_init.sql) |
-| [`App`](frontend/src/App.tsx) | component | [`frontend/src/App.tsx`](frontend/src/App.tsx) | chat/admin view를 전환하고 인증 여부에 따라 화면을 고른다. | [`useAppStore`](frontend/src/store.ts) |
+| [`App`](frontend/src/App.tsx) | component | [`frontend/src/App.tsx`](frontend/src/App.tsx) | `/achrai/` 경로에서는 관리자 화면을, 그 외에는 세션 여부에 따라 채팅 또는 QR 인증 화면을 고른다. | [`useAppStore`](frontend/src/store.ts) |
 | [`AuthPanel`](frontend/src/components/AuthPanel.tsx) | component | [`frontend/src/components/AuthPanel.tsx`](frontend/src/components/AuthPanel.tsx) | QR 가입, QR 로그인, QR payload 붙여넣기와 이미지 업로드 스캔을 처리한다. | [`api`](frontend/src/api.ts) |
 | [`ChatPanel`](frontend/src/components/ChatPanel.tsx) | component | [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx) | 메시지 조회, socket 구독, typing 전송, 메시지 전송을 처리한다. | [`scheduleReactivePlan`](backend/src/runtime/reactivePlanner.ts) |
-| [`AdminPanel`](frontend/src/components/AdminPanel.tsx) | component | [`frontend/src/components/AdminPanel.tsx`](frontend/src/components/AdminPanel.tsx) | 관리자 overview와 세션 메시지를 표시한다. | [`/api/admin/overview`](backend/src/routes/adminRoutes.ts) |
+| [`AdminPanel`](frontend/src/components/AdminPanel.tsx) | component | [`frontend/src/components/AdminPanel.tsx`](frontend/src/components/AdminPanel.tsx) | 관리자 로그인, overview, 세션 메시지 조회를 처리한다. | [`/api/admin/login`](backend/src/routes/adminRoutes.ts), [`/api/admin/overview`](backend/src/routes/adminRoutes.ts) |
 | [`useAppStore`](frontend/src/store.ts) | hook/store | [`frontend/src/store.ts`](frontend/src/store.ts) | session, QR, messages, presence 상태를 저장한다. | [`ChatPanel`](frontend/src/components/ChatPanel.tsx) |
 | [`api`](frontend/src/api.ts) | service | [`frontend/src/api.ts`](frontend/src/api.ts) | Axios instance와 API row type을 정의한다. | [`backendOrigin`](frontend/src/api.ts) |
 | [`GenerateRequest`](local-llm/server.py) | class | [`local-llm/server.py`](local-llm/server.py) | `/v1/generate` 요청 body schema다. | [`generate`](local-llm/server.py) |
@@ -539,6 +539,8 @@ Copy-Item .env.example .env -Force
 
 mock provider만 쓰려면 [`.env.example`](.env.example)의 `LLM_PROVIDER=mock`, `MOCK_PROVIDER=true` 흐름을 사용한다. 로컬 LLM을 쓰려면 `LLM_PROVIDER=hf-local`, `HF_LOCAL_URL=http://127.0.0.1:8010`, 그리고 `HF_MODEL_PATH` 또는 `HF_ALLOW_MODEL_DOWNLOAD=true`가 필요하다.
 
+관리자 대시보드를 쓰려면 `ACHRAI_ID`와 `ACHRAI_PW_SHA2_256`도 설정한다. `ACHRAI_PW_SHA2_256`은 비밀번호 원문이 아니라 SHA-256 hex 문자열이다.
+
 ### DB migration
 
 ```powershell
@@ -559,6 +561,9 @@ npm run dev
 
 - frontend: `http://localhost:5173`
 - backend: `http://localhost:4000`
+- 관리자 대시보드: `http://localhost:5173/achrai/`
+
+프론트 dev server는 `0.0.0.0:5173`으로 바인딩되므로 같은 Wi-Fi의 스마트폰에서도 `http://PC의_사설IP:5173`으로 접속할 수 있다. 관리자 화면은 `http://PC의_사설IP:5173/achrai/`를 사용한다.
 
 ### 로컬 LLM 서버 실행
 
@@ -605,7 +610,7 @@ npm run build
 npm test
 ```
 
-실제 실행 결과: [`backend/tests/policy.test.ts`](backend/tests/policy.test.ts)의 3개 테스트와 [`backend/tests/auth-qr.test.ts`](backend/tests/auth-qr.test.ts)의 QR 인증 테스트가 모두 통과했다. 리팩터링 이후 `npm test`와 `npm run build`를 다시 실행해 통과를 확인했다.
+실제 실행 결과: [`backend/tests/policy.test.ts`](backend/tests/policy.test.ts)의 3개 테스트, [`backend/tests/auth-qr.test.ts`](backend/tests/auth-qr.test.ts)의 QR 인증 테스트, [`backend/tests/admin-auth.test.ts`](backend/tests/admin-auth.test.ts)의 관리자 인증 테스트가 모두 통과했다. 리팩터링 이후 `npm test`와 `npm run build`를 다시 실행해 통과를 확인했다.
 
 ## 13. 테스트와 검증 방법
 
@@ -613,13 +618,14 @@ npm test
 | ----- | -- | ----- | --- | ----- |
 | proactive 정책 | `npm test` 중 [`backend/tests/policy.test.ts`](backend/tests/policy.test.ts) | [`scheduler/src/index.ts`](scheduler/src/index.ts), [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts) | Vitest 결과 | 긴 침묵+쿨다운, typing 중 응답 금지, high emotional silence 정책을 검증한다. 실제 실행에서 통과 확인. |
 | QR 인증 | `npm test` 중 [`backend/tests/auth-qr.test.ts`](backend/tests/auth-qr.test.ts) | [`backend/src/routes/authRoutes.ts`](backend/src/routes/authRoutes.ts), [`database/migrations/001_init.sql`](database/migrations/001_init.sql) | Vitest 결과 | QR payload 발급, 로그인 성공, payload 변조 실패를 확인한다. 현재 통과 확인. |
+| 관리자 인증 | `npm test` 중 [`backend/tests/admin-auth.test.ts`](backend/tests/admin-auth.test.ts) | [`backend/src/routes/adminRoutes.ts`](backend/src/routes/adminRoutes.ts), [`backend/src/config.ts`](backend/src/config.ts) | Vitest 결과 | 관리자 로그인 성공/실패, 미설정 실패, Bearer token 보호를 검증한다. 현재 통과 확인. |
 | backend health | `curl.exe http://localhost:4000/api/health` | [`backend/src/app.ts`](backend/src/app.ts) | `{ ok: true }` | backend 서버가 떠 있는지 확인한다. |
 | local LLM health | `curl.exe http://127.0.0.1:8010/health` | [`local-llm/server.py`](local-llm/server.py) | `{ ok: true, model: ... }` | 모델 로드와 FastAPI 서버 상태를 확인한다. 실제 실행은 확인 필요. |
 | QR 가입/로그인 수동 검증 | frontend에서 가입 후 QR payload로 로그인 | [`frontend/src/components/AuthPanel.tsx`](frontend/src/components/AuthPanel.tsx), [`backend/src/utils/qrPayload.ts`](backend/src/utils/qrPayload.ts) | `sessionId`, `userId`, 초기 assistant greeting | QR payload가 정상 생성/복원되는지 본다. |
 | reactive 채팅 | 메시지 입력 후 assistant 메시지 수신 | [`ChatPanel`](frontend/src/components/ChatPanel.tsx), [`scheduleReactivePlan`](backend/src/runtime/reactivePlanner.ts) | socket `message`, `presence` | 입력 직후 202가 오고, 지연 후 assistant 메시지가 socket으로 오는지 확인한다. |
 | typing 중 개입 방지 | 긴 문장을 입력하며 typing 상태 유지 | [`sendTyping`](frontend/src/components/ChatPanel.tsx), [`isUserTyping`](backend/src/db/sqlitePresenceEvents.ts) | assistant 응답 지연 | 사용자가 입력 중일 때 메시지가 발송되지 않아야 한다. |
 | proactive 발화 | `PROACTIVE_MIN_SILENCE_MS`를 낮춰 긴 침묵 상황을 만들기 | [`runProactiveLoop`](backend/src/runtime/proactiveLoop.ts), [`evaluateProactiveDecision`](scheduler/src/index.ts) | assistant proactive message, `proactive_events` row | cooldown과 silence 조건이 동작하는지 본다. |
-| 관리자 대시보드 | frontend에서 관리자 탭 클릭 | [`AdminPanel`](frontend/src/components/AdminPanel.tsx), [`/api/admin/overview`](backend/src/routes/adminRoutes.ts) | 사용자/세션/이벤트 표 | DB에 쌓인 대화 상태를 관찰한다. 인증 없음에 주의. |
+| 관리자 대시보드 | `/achrai/` 접속 후 관리자 로그인 | [`AdminPanel`](frontend/src/components/AdminPanel.tsx), [`/api/admin/login`](backend/src/routes/adminRoutes.ts), [`/api/admin/overview`](backend/src/routes/adminRoutes.ts) | 사용자/세션/이벤트 표 | `.env`의 `ACHRAI_ID`, `ACHRAI_PW_SHA2_256` 값과 로그인 입력이 맞아야 한다. |
 | DB migration | `npm run migrate` | [`database/src/migrate.ts`](database/src/migrate.ts), [`database/migrations/001_init.sql`](database/migrations/001_init.sql) | SQLite DB와 `schema_migrations` row | migration이 중복 실행되지 않고 적용되는지 확인한다. |
 | CSV/로그 결과물 | 확인 필요 | 확인 필요 | 확인 필요 | 저장소에서 CSV 결과 파일은 확인되지 않았다. 로그 파일 저장도 확인되지 않았다. |
 
@@ -658,7 +664,7 @@ GitHub Copilot과 Codex를 활용해 구현 속도를 높였고, 구조 이해, 
 
 ## 16. 현재 구조의 약점
 
-- [`/api/admin/overview`](backend/src/routes/adminRoutes.ts)와 [`/api/admin/sessions/:sessionId/messages`](backend/src/routes/adminRoutes.ts)는 인증 없이 접근 가능하다. 프로토타입 관찰용이라면 괜찮지만 실제 서비스에는 위험하다.
+- 관리자 토큰은 서버 메모리에만 저장된다. 서버 재시작 시 기존 관리자 로그인은 풀리고, 여러 서버 인스턴스에서는 토큰 공유가 되지 않는다.
 - [`database/src/migrate.ts`](database/src/migrate.ts)는 SQLite 전용이다. [`PostgresStore`](backend/src/db/store.ts)는 있지만 PostgreSQL migration 실행 경로는 확인 필요다.
 - [`prompt-engineering`](prompt-engineering)의 프롬프트 문서들은 현재 [`local-llm/server.py`](local-llm/server.py)나 provider에서 직접 읽지 않는다. 설계 문서와 실행 prompt가 분리되어 drift가 생길 수 있다.
 - [`database/migrations/001_init.sql`](database/migrations/001_init.sql)에 `safety_flags` 테이블이 있지만, 현재 코드에서 insert/query 사용은 확인되지 않았다.
@@ -672,7 +678,7 @@ GitHub Copilot과 Codex를 활용해 구현 속도를 높였고, 구조 이해, 
 | 난이도 | 개선 과제 | 기대 효과 | 관련 파일 |
 | --- | ----- | ----- | ----- |
 | Easy | prompt 문서가 코드에 반영되는지 표시 | 설계 prompt와 실행 prompt의 차이를 줄인다. | [`prompt-engineering`](prompt-engineering), [`local-llm/server.py`](local-llm/server.py) |
-| Medium | 관리자 API에 간단한 인증 추가 | 로컬 외 환경에서 대화 데이터 노출 위험을 줄인다. | [`backend/src/routes/adminRoutes.ts`](backend/src/routes/adminRoutes.ts), [`frontend/src/components/AdminPanel.tsx`](frontend/src/components/AdminPanel.tsx) |
+| Medium | 관리자 토큰 저장소를 영속/공유 저장소로 교체 | 서버 재시작이나 다중 인스턴스에서도 관리자 세션을 안정적으로 유지한다. | [`backend/src/routes/adminRoutes.ts`](backend/src/routes/adminRoutes.ts), [`frontend/src/components/AdminPanel.tsx`](frontend/src/components/AdminPanel.tsx) |
 | Medium | proactive event에 실제 sent/skip 결과 기록 | 관리자 대시보드의 관찰 정확도가 올라간다. | [`queuePlanMessages`](backend/src/runtime/messageQueue.ts), [`recordProactiveEvent`](backend/src/db/store.ts) |
 | Medium | HF response의 `nextState` enum 검증 강화 | 잘못된 LLM output으로 인한 상태 오염을 줄인다. | [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts), [`shared/src/index.ts`](shared/src/index.ts) |
 | Medium | PostgreSQL migration 경로 추가 | `DB_PROVIDER=postgres`를 실제 운영 후보로 만들 수 있다. | [`database/src/migrate.ts`](database/src/migrate.ts), [`backend/src/db/store.ts`](backend/src/db/store.ts) |
