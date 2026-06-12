@@ -84,19 +84,6 @@ LLM_PROVIDER=hf-local
 HF_LOCAL_URL=http://127.0.0.1:8010
 ```
 
-관리자 대시보드를 쓰려면 `.env`에 관리자 ID와 비밀번호의 SHA-256 hex 값을 넣습니다. 실제 비밀번호 원문은 저장하지 않습니다.
-
-```env
-ACHRAI_ID=admin
-ACHRAI_PW_SHA2_256=비밀번호_sha256_hex값
-```
-
-비밀번호 해시는 Node.js로 만들 수 있습니다.
-
-```powershell
-node -e "const crypto=require('crypto'); console.log(crypto.createHash('sha256').update('여기에_비밀번호').digest('hex'))"
-```
-
 ### 3) 로컬 LLM 서버 실행
 
 ```powershell
@@ -160,7 +147,19 @@ npm run dev
 - PC: http://localhost:5173/achrai/
 - 스마트폰: http://PC의_사설IP:5173/achrai/
 
-관리자 화면은 일반 첫 화면에 버튼으로 노출되지 않습니다. `/achrai/`로 직접 접속해 ID와 비밀번호를 입력하면, 브라우저가 비밀번호를 SHA-256으로 바꾼 뒤 서버의 `.env` 값과 대조합니다. 로그인 토큰은 `sessionStorage`에 저장되므로 탭을 닫으면 다시 로그인해야 합니다.
+백엔드가 시작될 때 1024×1 크기의 1-bit 흑백 BMP 키가 아래 경로에 새로 생성됩니다.
+
+```text
+runtime/achrai-admin-key.bmp
+```
+
+관리자 화면은 일반 첫 화면에 버튼으로 노출되지 않습니다. `/achrai/`로 직접 접속한 뒤 이번 실행에서 생성된 BMP 파일을 업로드하면 로그인됩니다. 다른 BMP나 이전 실행에서 만든 키는 거부됩니다.
+
+주의 사항
+
+- 앱을 다시 실행하면 BMP 키 파일을 덮어쓰고 기존 키와 관리자 로그인 토큰은 무효가 됩니다.
+- `runtime/`은 `.gitignore` 대상입니다. 키 파일을 커밋하거나 외부에 공유하지 마세요.
+- 로그인 토큰은 `sessionStorage`에 저장되므로 브라우저 탭을 닫으면 다시 로그인해야 합니다.
 
 ### 5) 스마트폰에서 접속 (같은 Wi-Fi)
 

@@ -13,20 +13,25 @@ function adminAuthHeaders(token: string) {
   return { Authorization: `Bearer ${token}` };
 }
 
-async function sha256Hex(value: string): Promise<string> {
-  const bytes = new TextEncoder().encode(value);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Bitmap read failed.'));
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      const base64 = result.split(',', 2)[1];
+      if (!base64) reject(new Error('Bitmap data is empty.'));
+      else resolve(base64);
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 // The admin panel is a local observability surface for the prototype. It shows
 // whether sessions, messages, and proactive outreach records are being created.
 export function AdminPanel() {
   const [token, setToken] = useState(() => sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? '');
-  const [adminId, setAdminId] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
+  const [adminBitmap, setAdminBitmap] = useState<File | undefined>();
   const [overview, setOverview] = useState<AdminOverview | undefined>();
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>();
   const [sessionMessages, setSessionMessages] = useState<ChatMessage[]>([]);
@@ -48,18 +53,19 @@ export function AdminPanel() {
   };
 
   const login = async () => {
+    if (!adminBitmap) return;
     setLoginLoading(true);
     setError(undefined);
     try {
-      const passwordSha256 = await sha256Hex(adminPassword);
-      const res = await api.post('/admin/login', { id: adminId, passwordSha256 });
+      const bitmapBase64 = await readFileAsBase64(adminBitmap);
+      const res = await api.post('/admin/login', { bitmapBase64 });
       const nextToken = typeof res.data?.token === 'string' ? res.data.token : '';
       if (!nextToken) throw new Error('Admin token was not returned.');
       sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, nextToken);
       setToken(nextToken);
-      setAdminPassword('');
+      setAdminBitmap(undefined);
     } catch {
-      setError('관리자 ID 또는 비밀번호가 올바르지 않습니다.');
+      setError('앱 실행 시 생성된 관리자 비트맵과 일치하지 않습니다.');
     } finally {
       setLoginLoading(false);
     }
@@ -119,22 +125,19 @@ export function AdminPanel() {
           }}
         >
           <h2>관리자 로그인</h2>
-          <label>
-            ID
-            <input value={adminId} onChange={(event) => setAdminId(event.target.value)} autoComplete="username" />
-          </label>
-          <label>
-            비밀번호
+          <p className="hint">이번 앱 실행에서 생성된 1024×1 흑백 BMP 키 파일을 선택하세요.</p>
+          <label className="admin-bitmap-input">
+            관리자 비트맵
             <input
-              value={adminPassword}
-              onChange={(event) => setAdminPassword(event.target.value)}
-              type="password"
-              autoComplete="current-password"
+              type="file"
+              accept="image/bmp,.bmp"
+              onChange={(event) => setAdminBitmap(event.target.files?.[0])}
             />
           </label>
+          {adminBitmap ? <div className="admin-file-name">{adminBitmap.name}</div> : null}
           {error ? <div className="error">{error}</div> : null}
-          <button className="btn primary" type="submit" disabled={loginLoading || !adminId || !adminPassword}>
-            {loginLoading ? '확인 중...' : '로그인'}
+          <button className="btn primary" type="submit" disabled={loginLoading || !adminBitmap}>
+            {loginLoading ? '확인 중...' : '비트맵으로 로그인'}
           </button>
         </form>
       </div>

@@ -357,10 +357,10 @@ graph TD
 - 주요 클래스: 확인 필요
 - 주요 함수 또는 메서드: [`AdminPanel`](frontend/src/components/AdminPanel.tsx), [`loadOverview`](frontend/src/components/AdminPanel.tsx), [`loadSessionMessages`](frontend/src/components/AdminPanel.tsx), [`listUsers`](backend/src/db/store.ts), [`listSessions`](backend/src/db/store.ts), [`listMessagesForSession`](backend/src/db/store.ts), [`listProactiveEvents`](backend/src/db/store.ts)
 - 주요 변수 또는 상수: [`AdminOverview`](frontend/src/components/AdminPanel.tsx), [`AdminUserRow`](frontend/src/api.ts), [`AdminSessionRow`](frontend/src/api.ts), [`AdminProactiveEventRow`](frontend/src/api.ts)
-- 입력: `/achrai/` 직접 접속, 관리자 ID, 비밀번호, session id
-- 처리: 프론트가 비밀번호를 SHA-256 hex로 변환해 `/api/admin/login`에 보내고, 성공 시 받은 Bearer token으로 `/api/admin/overview`와 `/api/admin/sessions/:sessionId/messages`를 호출한다.
+- 입력: `/achrai/` 직접 접속, 앱 시작 시 생성된 `runtime/achrai-admin-key.bmp`, session id
+- 처리: 백엔드는 시작할 때 1024×1 크기의 1-bit 흑백 BMP에 1024개의 랜덤 비트를 기록하고 SHA-256 digest를 메모리에 보관한다. 프론트가 업로드한 BMP 원본을 `/api/admin/login`에 보내면 형식과 digest를 검사하고, 성공 시 받은 Bearer token으로 `/api/admin/overview`와 `/api/admin/sessions/:sessionId/messages`를 호출한다.
 - 출력: 사용자/세션/메시지/선제 이벤트 테이블
-- 예외 또는 주의점: 관리자 ID와 SHA-256 해시는 [`.env`](.env)에 `ACHRAI_ID`, `ACHRAI_PW_SHA2_256`으로 설정해야 한다. 토큰은 서버 메모리와 브라우저 `sessionStorage`에만 있으므로 서버 재시작이나 탭 종료 시 다시 로그인해야 한다.
+- 예외 또는 주의점: 앱을 다시 시작하면 BMP 키 파일을 덮어쓰므로 이전 키는 사용할 수 없다. 키 파일은 [`.gitignore`](.gitignore)의 `runtime/` 규칙으로 제외된다. 토큰은 서버 메모리와 브라우저 `sessionStorage`에만 있으므로 서버 재시작이나 탭 종료 시 다시 로그인해야 한다.
 - 내가 면접에서 설명해야 할 핵심: “운영용 완성 기능이라기보다, 프로토타입의 대화 상태와 선제 발화 이벤트를 눈으로 확인하기 위한 관찰 도구입니다.”
 
 ## 9. 핵심 식별자 사전
@@ -539,8 +539,6 @@ Copy-Item .env.example .env -Force
 
 mock provider만 쓰려면 [`.env.example`](.env.example)의 `LLM_PROVIDER=mock`, `MOCK_PROVIDER=true` 흐름을 사용한다. 로컬 LLM을 쓰려면 `LLM_PROVIDER=hf-local`, `HF_LOCAL_URL=http://127.0.0.1:8010`, 그리고 `HF_MODEL_PATH` 또는 `HF_ALLOW_MODEL_DOWNLOAD=true`가 필요하다.
 
-관리자 대시보드를 쓰려면 `ACHRAI_ID`와 `ACHRAI_PW_SHA2_256`도 설정한다. `ACHRAI_PW_SHA2_256`은 비밀번호 원문이 아니라 SHA-256 hex 문자열이다.
-
 ### DB migration
 
 ```powershell
@@ -610,7 +608,7 @@ npm run build
 npm test
 ```
 
-실제 실행 결과: [`backend/tests/policy.test.ts`](backend/tests/policy.test.ts)의 3개 테스트, [`backend/tests/auth-qr.test.ts`](backend/tests/auth-qr.test.ts)의 QR 인증 테스트, [`backend/tests/admin-auth.test.ts`](backend/tests/admin-auth.test.ts)의 관리자 인증 테스트가 모두 통과했다. 리팩터링 이후 `npm test`와 `npm run build`를 다시 실행해 통과를 확인했다.
+테스트 구성에는 [`backend/tests/policy.test.ts`](backend/tests/policy.test.ts)의 정책 테스트, [`backend/tests/auth-qr.test.ts`](backend/tests/auth-qr.test.ts)의 QR 인증 테스트, [`backend/tests/admin-auth.test.ts`](backend/tests/admin-auth.test.ts)의 관리자 BMP 인증 테스트가 있다. 2026-06-12 변경에서는 TypeScript build와 실제 HTTP 로그인 수동 검증은 통과했지만, Vitest는 샌드박스의 `esbuild spawn EPERM` 때문에 실행하지 못했다.
 
 ## 13. 테스트와 검증 방법
 
@@ -618,14 +616,14 @@ npm test
 | ----- | -- | ----- | --- | ----- |
 | proactive 정책 | `npm test` 중 [`backend/tests/policy.test.ts`](backend/tests/policy.test.ts) | [`scheduler/src/index.ts`](scheduler/src/index.ts), [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts) | Vitest 결과 | 긴 침묵+쿨다운, typing 중 응답 금지, high emotional silence 정책을 검증한다. 실제 실행에서 통과 확인. |
 | QR 인증 | `npm test` 중 [`backend/tests/auth-qr.test.ts`](backend/tests/auth-qr.test.ts) | [`backend/src/routes/authRoutes.ts`](backend/src/routes/authRoutes.ts), [`database/migrations/001_init.sql`](database/migrations/001_init.sql) | Vitest 결과 | QR payload 발급, 로그인 성공, payload 변조 실패를 확인한다. 현재 통과 확인. |
-| 관리자 인증 | `npm test` 중 [`backend/tests/admin-auth.test.ts`](backend/tests/admin-auth.test.ts) | [`backend/src/routes/adminRoutes.ts`](backend/src/routes/adminRoutes.ts), [`backend/src/config.ts`](backend/src/config.ts) | Vitest 결과 | 관리자 로그인 성공/실패, 미설정 실패, Bearer token 보호를 검증한다. 현재 통과 확인. |
+| 관리자 인증 | `npm test` 중 [`backend/tests/admin-auth.test.ts`](backend/tests/admin-auth.test.ts) | [`backend/src/routes/adminRoutes.ts`](backend/src/routes/adminRoutes.ts), [`backend/src/utils/adminBitmap.ts`](backend/src/utils/adminBitmap.ts) | Vitest 결과 | 1024×1 1-bit BMP 생성, 올바른 키 로그인, 다른 키와 잘못된 크기 거부, Bearer token 보호를 검증한다. 2026-06-12에는 수동 HTTP 검증만 통과했다. |
 | backend health | `curl.exe http://localhost:4000/api/health` | [`backend/src/app.ts`](backend/src/app.ts) | `{ ok: true }` | backend 서버가 떠 있는지 확인한다. |
 | local LLM health | `curl.exe http://127.0.0.1:8010/health` | [`local-llm/server.py`](local-llm/server.py) | `{ ok: true, model: ... }` | 모델 로드와 FastAPI 서버 상태를 확인한다. 실제 실행은 확인 필요. |
 | QR 가입/로그인 수동 검증 | frontend에서 가입 후 QR payload로 로그인 | [`frontend/src/components/AuthPanel.tsx`](frontend/src/components/AuthPanel.tsx), [`backend/src/utils/qrPayload.ts`](backend/src/utils/qrPayload.ts) | `sessionId`, `userId`, 초기 assistant greeting | QR payload가 정상 생성/복원되는지 본다. |
 | reactive 채팅 | 메시지 입력 후 assistant 메시지 수신 | [`ChatPanel`](frontend/src/components/ChatPanel.tsx), [`scheduleReactivePlan`](backend/src/runtime/reactivePlanner.ts) | socket `message`, `presence` | 입력 직후 202가 오고, 지연 후 assistant 메시지가 socket으로 오는지 확인한다. |
 | typing 중 개입 방지 | 긴 문장을 입력하며 typing 상태 유지 | [`sendTyping`](frontend/src/components/ChatPanel.tsx), [`isUserTyping`](backend/src/db/sqlitePresenceEvents.ts) | assistant 응답 지연 | 사용자가 입력 중일 때 메시지가 발송되지 않아야 한다. |
 | proactive 발화 | `PROACTIVE_MIN_SILENCE_MS`를 낮춰 긴 침묵 상황을 만들기 | [`runProactiveLoop`](backend/src/runtime/proactiveLoop.ts), [`evaluateProactiveDecision`](scheduler/src/index.ts) | assistant proactive message, `proactive_events` row | cooldown과 silence 조건이 동작하는지 본다. |
-| 관리자 대시보드 | `/achrai/` 접속 후 관리자 로그인 | [`AdminPanel`](frontend/src/components/AdminPanel.tsx), [`/api/admin/login`](backend/src/routes/adminRoutes.ts), [`/api/admin/overview`](backend/src/routes/adminRoutes.ts) | 사용자/세션/이벤트 표 | `.env`의 `ACHRAI_ID`, `ACHRAI_PW_SHA2_256` 값과 로그인 입력이 맞아야 한다. |
+| 관리자 대시보드 | `/achrai/` 접속 후 이번 실행의 BMP 키 업로드 | [`AdminPanel`](frontend/src/components/AdminPanel.tsx), [`/api/admin/login`](backend/src/routes/adminRoutes.ts), [`/api/admin/overview`](backend/src/routes/adminRoutes.ts) | 사용자/세션/이벤트 표 | `runtime/achrai-admin-key.bmp`와 업로드 파일이 정확히 일치해야 한다. |
 | DB migration | `npm run migrate` | [`database/src/migrate.ts`](database/src/migrate.ts), [`database/migrations/001_init.sql`](database/migrations/001_init.sql) | SQLite DB와 `schema_migrations` row | migration이 중복 실행되지 않고 적용되는지 확인한다. |
 | CSV/로그 결과물 | 확인 필요 | 확인 필요 | 확인 필요 | 저장소에서 CSV 결과 파일은 확인되지 않았다. 로그 파일 저장도 확인되지 않았다. |
 
@@ -665,6 +663,7 @@ GitHub Copilot과 Codex를 활용해 구현 속도를 높였고, 구조 이해, 
 ## 16. 현재 구조의 약점
 
 - 관리자 토큰은 서버 메모리에만 저장된다. 서버 재시작 시 기존 관리자 로그인은 풀리고, 여러 서버 인스턴스에서는 토큰 공유가 되지 않는다.
+- 관리자 BMP 키도 서버 시작마다 다시 생성되어 `runtime/achrai-admin-key.bmp`를 덮어쓴다. 서버 재시작 후 이전 키를 복구하는 흐름은 없다.
 - [`database/src/migrate.ts`](database/src/migrate.ts)는 SQLite 전용이다. [`PostgresStore`](backend/src/db/store.ts)는 있지만 PostgreSQL migration 실행 경로는 확인 필요다.
 - [`prompt-engineering`](prompt-engineering)의 프롬프트 문서들은 현재 [`local-llm/server.py`](local-llm/server.py)나 provider에서 직접 읽지 않는다. 설계 문서와 실행 prompt가 분리되어 drift가 생길 수 있다.
 - [`database/migrations/001_init.sql`](database/migrations/001_init.sql)에 `safety_flags` 테이블이 있지만, 현재 코드에서 insert/query 사용은 확인되지 않았다.

@@ -32,7 +32,5 @@ export const config = {
   mockProvider: process.env.MOCK_PROVIDER !== 'false',
   llmProvider: providerMode(),
   hfLocalUrl: process.env.HF_LOCAL_URL ?? 'http://127.0.0.1:8010',
-  hfLocalTimeoutMs: num('HF_LOCAL_TIMEOUT_MS', 30000),  // Reduced from 40s
-  achraiId: process.env.ACHRAI_ID?.trim() ?? '',
-  achraiPwSha256: process.env.ACHRAI_PW_SHA2_256?.trim().toLowerCase() ?? ''
+  hfLocalTimeoutMs: num('HF_LOCAL_TIMEOUT_MS', 30000)  // Reduced from 40s
 } as const;

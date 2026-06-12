@@ -13,6 +13,11 @@ import { createMessageQueue } from './runtime/messageQueue.js';
 import { createProactiveScheduler } from './runtime/proactiveLoop.js';
 import { createReactivePlanner } from './runtime/reactivePlanner.js';
 import { attachSocket, createRealtimeEmitter, type SocketLike } from './runtime/realtime.js';
+import { createAndSaveAdminBitmap } from './utils/adminBitmap.js';
+
+export interface CreateAppOptions {
+  adminBitmap?: Buffer;
+}
 
 export interface AppServices {
   app: express.Express;
@@ -24,7 +29,7 @@ export { attachSocket };
 
 // createApp is now the composition root: it wires dependencies together while
 // keeping route behavior, timers, and realtime details in smaller files.
-export function createApp(): AppServices {
+export function createApp(options: CreateAppOptions = {}): AppServices {
   const app = express();
   let io: SocketLike | undefined;
 
@@ -32,6 +37,7 @@ export function createApp(): AppServices {
   const provider = createProvider();
   const generator = new MessageGenerator(provider);
   const orchestrator = new ConversationOrchestrator(provider);
+  const adminBitmap = options.adminBitmap ?? createAndSaveAdminBitmap();
 
   app.use(cors());
   app.use(express.json({ limit: '1mb' }));
@@ -68,7 +74,7 @@ export function createApp(): AppServices {
     emitUserTyping: realtime.emitUserTyping,
     scheduleReactivePlan: reactive.scheduleReactivePlan
   });
-  registerAdminRoutes(app, store);
+  registerAdminRoutes(app, store, adminBitmap);
 
   app.use((err: unknown, _req: Request, res: Response, _next: express.NextFunction) => {
     console.error(err);

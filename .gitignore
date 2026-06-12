@@ -14,3 +14,4 @@ coverage/
 frontend/.vite/
 test-cases/
 .prompts.md
+/runtime/

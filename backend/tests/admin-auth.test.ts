@@ -4,84 +4,64 @@ import crypto from 'node:crypto';
 import Database from 'better-sqlite3';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createRandomAdminBitmap, isValidAdminBitmap } from '../src/utils/adminBitmap.js';
 
 function prepareTempDb(dbPath: string): void {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new Database(dbPath);
   const migrationPath = path.resolve(process.cwd(), '../database/migrations/001_init.sql');
-  const migration = fs.readFileSync(migrationPath, 'utf8');
-  db.exec(migration);
+  db.exec(fs.readFileSync(migrationPath, 'utf8'));
   db.close();
 }
 
-function sha256(input: string): string {
-  return crypto.createHash('sha256').update(input).digest('hex');
-}
-
-async function createTestApp(adminEnv?: { id: string; passwordHash: string }) {
+async function createTestApp(adminBitmap: Buffer) {
   const dbName = `test-admin-auth-${crypto.randomUUID()}.db`;
-  const dbPath = path.resolve(process.cwd(), `../database/${dbName}`);
-  prepareTempDb(dbPath);
-
+  prepareTempDb(path.resolve(process.cwd(), `../database/${dbName}`));
   process.env.DB_PROVIDER = 'sqlite';
   process.env.SQLITE_PATH = `./database/${dbName}`;
   process.env.MOCK_PROVIDER = 'true';
-  if (adminEnv) {
-    process.env.ACHRAI_ID = adminEnv.id;
-    process.env.ACHRAI_PW_SHA2_256 = adminEnv.passwordHash;
-  } else {
-    delete process.env.ACHRAI_ID;
-    delete process.env.ACHRAI_PW_SHA2_256;
-  }
-
   const mod = await import('../src/app.js');
-  return mod.createApp().app;
+  return mod.createApp({ adminBitmap }).app;
 }
 
-describe('admin auth', () => {
+function loginBody(bitmap: Buffer): { bitmapBase64: string } {
+  return { bitmapBase64: bitmap.toString('base64') };
+}
+
+describe('admin bitmap auth', () => {
   beforeEach(() => {
     vi.resetModules();
   });
 
-  it('logs in with configured admin id and password hash', async () => {
-    const app = await createTestApp({ id: 'achrai', passwordHash: sha256('secret') });
+  it('creates a valid 1024 by 1 monochrome bitmap', () => {
+    expect(isValidAdminBitmap(createRandomAdminBitmap())).toBe(true);
+  });
 
-    const res = await request(app)
-      .post('/api/admin/login')
-      .send({ id: 'achrai', passwordSha256: sha256('secret') })
-      .expect(200);
-
+  it('logs in with the bitmap generated for this app run', async () => {
+    const bitmap = createRandomAdminBitmap();
+    const app = await createTestApp(bitmap);
+    const res = await request(app).post('/api/admin/login').send(loginBody(bitmap)).expect(200);
     expect(res.body.token).toEqual(expect.any(String));
   });
 
-  it('rejects invalid admin credentials', async () => {
-    const app = await createTestApp({ id: 'achrai', passwordHash: sha256('secret') });
-
-    await request(app)
-      .post('/api/admin/login')
-      .send({ id: 'achrai', passwordSha256: sha256('wrong') })
-      .expect(401);
+  it('rejects another valid bitmap', async () => {
+    const app = await createTestApp(createRandomAdminBitmap());
+    await request(app).post('/api/admin/login').send(loginBody(createRandomAdminBitmap())).expect(401);
   });
 
-  it('fails clearly when admin credentials are not configured', async () => {
-    const app = await createTestApp();
-
-    await request(app)
-      .post('/api/admin/login')
-      .send({ id: 'achrai', passwordSha256: sha256('secret') })
-      .expect(503);
+  it('rejects a bitmap with the wrong dimensions', async () => {
+    const bitmap = createRandomAdminBitmap();
+    const invalidBitmap = Buffer.from(bitmap);
+    invalidBitmap.writeInt32LE(512, 18);
+    const app = await createTestApp(bitmap);
+    await request(app).post('/api/admin/login').send(loginBody(invalidBitmap)).expect(401);
   });
 
   it('protects admin data routes with bearer token auth', async () => {
-    const app = await createTestApp({ id: 'achrai', passwordHash: sha256('secret') });
-
+    const bitmap = createRandomAdminBitmap();
+    const app = await createTestApp(bitmap);
     await request(app).get('/api/admin/overview').expect(401);
-
-    const loginRes = await request(app)
-      .post('/api/admin/login')
-      .send({ id: 'achrai', passwordSha256: sha256('secret') })
-      .expect(200);
-
+    const loginRes = await request(app).post('/api/admin/login').send(loginBody(bitmap)).expect(200);
     await request(app)
       .get('/api/admin/overview')
       .set('Authorization', `Bearer ${loginRes.body.token}`)
