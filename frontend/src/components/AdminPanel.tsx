@@ -65,7 +65,7 @@ export function AdminPanel() {
       setToken(nextToken);
       setAdminBitmap(undefined);
     } catch {
-      setError('앱 실행 시 생성된 관리자 비트맵과 일치하지 않습니다.');
+      setError('앱 실행 시 생성된 관리자 가짜 QR 키와 일치하지 않습니다.');
     } finally {
       setLoginLoading(false);
     }
@@ -125,9 +125,9 @@ export function AdminPanel() {
           }}
         >
           <h2>관리자 로그인</h2>
-          <p className="hint">이번 앱 실행에서 생성된 1024×1 흑백 BMP 키 파일을 선택하세요.</p>
+          <p className="hint">이번 앱 실행에서 생성된 64×64 가짜 QR BMP 키 파일을 선택하세요.</p>
           <label className="admin-bitmap-input">
-            관리자 비트맵
+            관리자 가짜 QR 키
             <input
               type="file"
               accept="image/bmp,.bmp"
@@ -137,7 +137,7 @@ export function AdminPanel() {
           {adminBitmap ? <div className="admin-file-name">{adminBitmap.name}</div> : null}
           {error ? <div className="error">{error}</div> : null}
           <button className="btn primary" type="submit" disabled={loginLoading || !adminBitmap}>
-            {loginLoading ? '확인 중...' : '비트맵으로 로그인'}
+            {loginLoading ? '확인 중...' : '가짜 QR로 로그인'}
           </button>
         </form>
       </div>

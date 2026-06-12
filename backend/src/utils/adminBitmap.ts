@@ -3,12 +3,82 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { findRepoRoot } from '../db/common.js';
 
-export const ADMIN_BITMAP_WIDTH = 1024;
-export const ADMIN_BITMAP_HEIGHT = 1;
-export const ADMIN_BITMAP_SIZE = 190;
+export const ADMIN_BITMAP_WIDTH = 64;
+export const ADMIN_BITMAP_HEIGHT = 64;
 
 const PIXEL_OFFSET = 62;
-const PIXEL_BYTES = ADMIN_BITMAP_WIDTH / 8;
+const ROW_BYTES = Math.ceil(ADMIN_BITMAP_WIDTH / 8);
+const ROW_STRIDE = Math.ceil(ROW_BYTES / 4) * 4;
+const PIXEL_BYTES = ROW_STRIDE * ADMIN_BITMAP_HEIGHT;
+export const ADMIN_BITMAP_SIZE = PIXEL_OFFSET + PIXEL_BYTES;
+const QUIET_ZONE = 4;
+const FINDER_SIZE = 7;
+const ALIGNMENT_SIZE = 5;
+
+function setModule(bitmap: Buffer, x: number, y: number, black: boolean): void {
+  const bmpRow = ADMIN_BITMAP_HEIGHT - 1 - y;
+  const byteOffset = PIXEL_OFFSET + bmpRow * ROW_STRIDE + Math.floor(x / 8);
+  const mask = 1 << (7 - (x % 8));
+  const currentByte = bitmap.readUInt8(byteOffset);
+  bitmap.writeUInt8(black ? currentByte & ~mask : currentByte | mask, byteOffset);
+}
+
+function drawFinderPattern(bitmap: Buffer, left: number, top: number): void {
+  for (let y = -1; y <= FINDER_SIZE; y += 1) {
+    for (let x = -1; x <= FINDER_SIZE; x += 1) {
+      const inFinder = x >= 0 && x < FINDER_SIZE && y >= 0 && y < FINDER_SIZE;
+      const black =
+        inFinder &&
+        (x === 0 || x === FINDER_SIZE - 1 || y === 0 || y === FINDER_SIZE - 1 || (x >= 2 && x <= 4 && y >= 2 && y <= 4));
+      setModule(bitmap, left + x, top + y, black);
+    }
+  }
+}
+
+function drawTimingPatterns(bitmap: Buffer, farFinder: number): void {
+  const timingAxis = QUIET_ZONE + FINDER_SIZE - 1;
+  const timingStart = QUIET_ZONE + FINDER_SIZE + 1;
+  const timingEnd = farFinder - 2;
+
+  for (let offset = 0; timingStart + offset <= timingEnd; offset += 1) {
+    const black = offset % 2 === 0;
+    setModule(bitmap, timingStart + offset, timingAxis, black);
+    setModule(bitmap, timingAxis, timingStart + offset, black);
+  }
+}
+
+function drawAlignmentPattern(bitmap: Buffer, left: number, top: number): void {
+  for (let y = -1; y <= ALIGNMENT_SIZE; y += 1) {
+    for (let x = -1; x <= ALIGNMENT_SIZE; x += 1) {
+      const inPattern = x >= 0 && x < ALIGNMENT_SIZE && y >= 0 && y < ALIGNMENT_SIZE;
+      const black =
+        inPattern &&
+        (x === 0 || x === ALIGNMENT_SIZE - 1 || y === 0 || y === ALIGNMENT_SIZE - 1 || (x === 2 && y === 2));
+      setModule(bitmap, left + x, top + y, black);
+    }
+  }
+}
+
+function drawPseudoQrModules(bitmap: Buffer): void {
+  bitmap.fill(255, PIXEL_OFFSET);
+  const randomBits = crypto.randomBytes(ADMIN_BITMAP_WIDTH * ADMIN_BITMAP_HEIGHT / 8);
+
+  for (let y = QUIET_ZONE; y < ADMIN_BITMAP_HEIGHT - QUIET_ZONE; y += 1) {
+    for (let x = QUIET_ZONE; x < ADMIN_BITMAP_WIDTH - QUIET_ZONE; x += 1) {
+      const index = y * ADMIN_BITMAP_WIDTH + x;
+      const randomByte = randomBits.readUInt8(Math.floor(index / 8));
+      const black = (randomByte & (1 << (index % 8))) !== 0;
+      setModule(bitmap, x, y, black);
+    }
+  }
+
+  const farFinder = ADMIN_BITMAP_WIDTH - QUIET_ZONE - FINDER_SIZE;
+  drawTimingPatterns(bitmap, farFinder);
+  drawFinderPattern(bitmap, QUIET_ZONE, QUIET_ZONE);
+  drawFinderPattern(bitmap, farFinder, QUIET_ZONE);
+  drawFinderPattern(bitmap, QUIET_ZONE, farFinder);
+  drawAlignmentPattern(bitmap, farFinder - 7, farFinder - 7);
+}
 
 export function createRandomAdminBitmap(): Buffer {
   const bitmap = Buffer.alloc(ADMIN_BITMAP_SIZE);
@@ -30,7 +100,7 @@ export function createRandomAdminBitmap(): Buffer {
   bitmap[58] = 255;
   bitmap[59] = 255;
   bitmap[60] = 255;
-  crypto.randomFillSync(bitmap, PIXEL_OFFSET, PIXEL_BYTES);
+  drawPseudoQrModules(bitmap);
   return bitmap;
 }
 

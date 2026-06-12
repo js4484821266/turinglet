@@ -28,13 +28,27 @@ function loginBody(bitmap: Buffer): { bitmapBase64: string } {
   return { bitmapBase64: bitmap.toString('base64') };
 }
 
+function isBlackModule(bitmap: Buffer, x: number, y: number): boolean {
+  const pixelOffset = bitmap.readUInt32LE(10);
+  const rowStride = 8;
+  const bmpRow = 64 - 1 - y;
+  const pixelByte = bitmap.readUInt8(pixelOffset + bmpRow * rowStride + Math.floor(x / 8));
+  return (pixelByte & (1 << (7 - (x % 8)))) === 0;
+}
+
 describe('admin bitmap auth', () => {
   beforeEach(() => {
     vi.resetModules();
   });
 
-  it('creates a valid 1024 by 1 monochrome bitmap', () => {
-    expect(isValidAdminBitmap(createRandomAdminBitmap())).toBe(true);
+  it('creates a valid 64 by 64 pseudo QR bitmap', () => {
+    const bitmap = createRandomAdminBitmap();
+    expect(isValidAdminBitmap(bitmap)).toBe(true);
+    expect(isBlackModule(bitmap, 12, 10)).toBe(true);
+    expect(isBlackModule(bitmap, 13, 10)).toBe(false);
+    expect(isBlackModule(bitmap, 10, 12)).toBe(true);
+    expect(isBlackModule(bitmap, 10, 13)).toBe(false);
+    expect(isBlackModule(bitmap, 48, 48)).toBe(true);
   });
 
   it('logs in with the bitmap generated for this app run', async () => {
