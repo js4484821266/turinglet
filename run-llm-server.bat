@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-echo Starting Sammagou LLM Server with auto-restart...
+echo Starting Saammagou LLM Server with auto-restart...
 echo.
 
 :restart

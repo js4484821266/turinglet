@@ -1,5 +1,5 @@
 #!/bin/pwsh
-# Sammagou LLM Server with auto-restart and monitoring
+# Saammagou LLM Server with auto-restart and monitoring
 
 param(
     [int]$MaxRestarts = 0  # 0 = infinite

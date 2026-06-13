@@ -9,7 +9,7 @@ async function createWindow(): Promise<void> {
     webPreferences: {
       contextIsolation: true
     },
-    title: '산마고우 | Sammagou'
+    title: '산마고우 | Saammagou'
   });
 
   let retries = 0;
