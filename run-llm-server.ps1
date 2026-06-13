@@ -1,5 +1,5 @@
 #!/bin/pwsh
-# Turinglet LLM Server with auto-restart and monitoring
+# Sammagou LLM Server with auto-restart and monitoring
 
 param(
     [int]$MaxRestarts = 0  # 0 = infinite

@@ -11,6 +11,10 @@ export function App() {
 
   return (
     <main className="page">
+      <header className="brand-head">
+        <h1>산마고우</h1>
+        <span>Sammagou</span>
+      </header>
       {isAdminPath ? <AdminPanel /> : sessionId ? <ChatPanel /> : <AuthPanel />}
     </main>
   );

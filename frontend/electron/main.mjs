@@ -9,7 +9,7 @@ async function createWindow() {
     webPreferences: {
       contextIsolation: true
     },
-    title: 'Turinglet Prototype'
+    title: '산마고우 | Sammagou'
   });
 
   let retries = 0;

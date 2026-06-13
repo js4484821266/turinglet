@@ -29,6 +29,24 @@ body {
   padding: 20px;
 }
 
+.brand-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.brand-head h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 0;
+}
+
+.brand-head span {
+  color: #45555e;
+  font-size: 14px;
+}
+
 .top-bar {
   display: flex;
   gap: 10px;
