@@ -9,7 +9,7 @@ async function createWindow() {
     webPreferences: {
       contextIsolation: true
     },
-    title: '산마고우 | Saammagou'
+    title: '삼마고 | Saammago'
   });
 
   let retries = 0;
