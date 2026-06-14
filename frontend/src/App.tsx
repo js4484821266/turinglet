@@ -13,7 +13,7 @@ export function App() {
     <main className="page">
       <header className="brand-head">
         <h1>삼마고</h1>
-        <span>Saammago</span>
+        <span>Saammaago</span>
       </header>
       {isAdminPath ? <AdminPanel /> : sessionId ? <ChatPanel /> : <AuthPanel />}
     </main>

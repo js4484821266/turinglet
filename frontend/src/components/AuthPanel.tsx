@@ -70,7 +70,7 @@ export function AuthPanel() {
         {qrDataUrl ? (
           <div className="qr-block">
             <img src={qrDataUrl} alt="QR" className="qr" />
-            <a className="btn ghost" href={qrDataUrl} download="saammago-identity-qr.png">
+            <a className="btn ghost" href={qrDataUrl} download="saammaago-identity-qr.png">
               QR 다운로드
             </a>
             {recoveryCode ? <p className="hint">복구코드: {recoveryCode}</p> : null}

@@ -71,7 +71,7 @@ class GenerateResponse(BaseModel):
     error: Optional[str] = None
 
 
-app = FastAPI(title="Saammago Local LLM")
+app = FastAPI(title="Saammaago Local LLM")
 
 
 # Prefer an explicit local GGUF path. Downloading is opt-in so server startup does
