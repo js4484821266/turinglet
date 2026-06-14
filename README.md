@@ -71,13 +71,25 @@
 
 ## 실행 방법
 
-### 1) 의존성 설치
+운영체제별 주요 명령은 다음과 같습니다.
+
+| 작업 | Windows PowerShell | Debian Bash |
+| --- | --- | --- |
+| 환경 파일 생성 | `Copy-Item .env.example .env -Force` | `cp .env.example .env` |
+| Python 가상환경 활성화 | `.\.venv-llm\Scripts\Activate.ps1` | `source .venv-llm/bin/activate` |
+| LLM 실행 | `npm run llm:server:windows` | `npm run llm:server:debian` |
+| 앱 개발 실행 | `npm run dev` | `npm run dev` |
+| production 자동 배포 | 해당 없음 | `sudo bash deploy/debian-gcp.sh` |
+
+### Windows 로컬 실행
+
+#### 1) 의존성 설치
 
 ```powershell
 npm install
 ```
 
-### 2) 환경 변수 준비
+#### 2) 환경 변수 준비
 
 ```powershell
 Copy-Item .env.example .env -Force
@@ -90,7 +102,7 @@ LLM_PROVIDER=hf-local
 HF_LOCAL_URL=http://127.0.0.1:8010
 ```
 
-### 3) 로컬 LLM 서버 실행
+#### 3) 로컬 LLM 서버 실행
 
 ```powershell
 python -m venv .venv-llm
@@ -115,7 +127,7 @@ HF_MODEL_FILE=Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
 ```
 
 ```powershell
-npm run llm:server
+npm run llm:server:windows
 ```
 
 서버가 예외나 모델 문제로 종료될 때 자동 재시작까지 보고 싶으면 PowerShell 스크립트를 사용할 수 있습니다.
@@ -136,7 +148,7 @@ npm run llm:server
 curl.exe http://127.0.0.1:8010/health
 ```
 
-### 4) 앱 실행
+#### 4) 앱 실행
 
 ```powershell
 npm run migrate
@@ -167,7 +179,7 @@ runtime/achrai-admin-key.bmp
 - `runtime/`은 `.gitignore` 대상입니다. 키 파일을 커밋하거나 외부에 공유하지 마세요.
 - 로그인 토큰은 `sessionStorage`에 저장되므로 브라우저 탭을 닫으면 다시 로그인해야 합니다.
 
-### 5) 스마트폰에서 접속 (같은 Wi-Fi)
+#### 5) 스마트폰에서 접속 (같은 Wi-Fi)
 
 이제 별도 `dev:mobile` 없이 `npm run dev`만 실행해도 스마트폰 접속이 가능합니다.
 
@@ -184,6 +196,43 @@ http://192.168.0.12:5173
 - 프론트는 LAN 바인딩(`0.0.0.0`)으로 실행됩니다.
 - API와 소켓은 접속한 호스트 IP 기준으로 자동 연결됩니다.
 - 접속이 안 되면 Windows 방화벽에서 5173, 4000 포트를 허용해야 합니다.
+
+### Debian 로컬 개발 실행
+
+Debian에서 production 서비스가 아니라 개발 서버로 실행할 때 사용합니다. Node.js 20 이상과 Python 3이 설치되어 있어야 합니다.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential cmake libopenblas-dev python3 python3-dev python3-pip python3-venv
+npm ci
+cp .env.example .env
+python3 -m venv .venv-llm
+source .venv-llm/bin/activate
+python -m pip install --upgrade pip
+pip install -r local-llm/requirements.txt
+```
+
+`.env`의 모델 설정은 Windows와 같습니다. GGUF 파일 경로를 `HF_MODEL_PATH`로 지정하거나, `HF_ALLOW_MODEL_DOWNLOAD=true`로 자동 다운로드를 허용합니다.
+
+터미널 하나에서 LLM 서버를 실행합니다.
+
+```bash
+npm run llm:server:debian
+```
+
+다른 터미널에서 앱을 실행합니다.
+
+```bash
+npm run migrate
+npm run dev
+```
+
+```bash
+curl http://127.0.0.1:8010/health
+curl http://127.0.0.1:4000/api/health
+```
+
+기본 접속 주소는 Windows와 동일하게 `http://localhost:5173`이며, 관리자 화면은 `http://localhost:5173/achrai/`입니다.
 
 ## GCP Debian 한 줄 배포
 

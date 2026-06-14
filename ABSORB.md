@@ -522,6 +522,8 @@ graph TD
 
 ### 설치 명령
 
+Windows PowerShell과 Debian Bash는 Python 가상환경 경로와 활성화 명령이 다르다. 앱 개발 명령은 공통으로 `npm run dev`를 사용하고, LLM은 각각 `npm run llm:server:windows`, `npm run llm:server:debian`을 사용한다.
+
 ```powershell
 npm install
 ```
@@ -558,6 +560,8 @@ npm run dev
 ```
 
 루트 [`package.json`](package.json)의 `predev`가 먼저 [`shared`](shared), [`scheduler`](scheduler), [`database`](database)를 build하고 migration을 실행한 뒤, [`backend`](backend)와 [`frontend`](frontend)를 동시에 실행한다.
+
+Debian 로컬 개발에서는 `.venv-llm/bin/python`을 사용하는 `npm run llm:server:debian`을 실행한다. Windows의 기존 `npm run llm:server`는 호환성을 위해 `npm run llm:server:windows`를 호출한다.
 
 기본 주소:
 
