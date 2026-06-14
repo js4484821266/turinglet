@@ -57,6 +57,7 @@
 | [`tsconfig.base.json`](tsconfig.base.json) | 설정 | 모든 TS 패키지의 공통 compiler option이다. | Medium | strict 설정 포함. |
 | [`run-llm-server.ps1`](run-llm-server.ps1) | 설정/기타 | LLM 서버를 자동 재시작하는 PowerShell 스크립트다. | Medium | Windows 실행 편의. |
 | [`run-llm-server.bat`](run-llm-server.bat) | 설정/기타 | LLM 서버를 자동 재시작하는 batch 스크립트다. | Medium | Windows 실행 편의. |
+| [`deploy/debian-gcp.sh`](deploy/debian-gcp.sh) | 배포 | Debian GCP VM에 의존성, GGUF, build, migration, systemd 서비스를 한 번에 구성한다. | High | 외부 IP의 HTTP 80번 포트로 production 서비스를 올린다. |
 
 ## 4. 리소스 인벤토리
 
@@ -85,6 +86,7 @@
 | [`prompt-engineering/proactive-outreach-prompt.md`](prompt-engineering/proactive-outreach-prompt.md) | 문서 | 프롬프트 설계 자료 | 선제 발화 제약 | proactive 메시지 설계 근거가 약해진다. |
 | [`run-llm-server.ps1`](run-llm-server.ps1) | 기타 | LLM 서버 실행 | `npm run llm:server` 자동 재시작 | Windows에서 안정 실행 보조가 사라진다. |
 | [`run-llm-server.bat`](run-llm-server.bat) | 기타 | LLM 서버 실행 | venv 활성화 후 자동 재시작 | batch 기반 실행 보조가 사라진다. |
+| [`deploy/debian-gcp.sh`](deploy/debian-gcp.sh) | 배포 | GCP Debian production 설치 | Node/Python 설치, GGUF 다운로드, systemd 등록, HTTP health 확인 | 한 줄 GCP 배포와 재배포 절차를 잃는다. |
 | [`screenshots/44444 initial.png`](<screenshots/44444 initial.png>) | 이미지 | 코드 참조 없음 | 초기 화면 검증 이미지로 보임 | 수동 검증 증거가 줄어든다. |
 | [`screenshots/66666 created id.png`](<screenshots/66666 created id.png>) | 이미지 | 코드 참조 없음 | QR/ID 생성 화면 검증 이미지로 보임 | 수동 검증 증거가 줄어든다. |
 | [`screenshots/77777 chat initial.png`](<screenshots/77777 chat initial.png>) | 이미지 | 코드 참조 없음 | 채팅 초기 화면 검증 이미지로 보임 | 수동 검증 증거가 줄어든다. |
@@ -565,6 +567,24 @@ npm run dev
 
 프론트 dev server는 `0.0.0.0:5173`으로 바인딩되므로 같은 Wi-Fi의 스마트폰에서도 `http://PC의_사설IP:5173`으로 접속할 수 있다. 관리자 화면은 `http://PC의_사설IP:5173/achrai/`를 사용한다.
 
+### GCP Debian production 배포
+
+```bash
+sudo bash deploy/debian-gcp.sh
+```
+
+[`deploy/debian-gcp.sh`](deploy/debian-gcp.sh)는 Node.js 20과 Python 빌드 환경을 설치하고, `.env`를 `PORT=80`, `LLM_PROVIDER=hf-local`로 맞춘다. 기본 GGUF를 repo 내부 cache에 다운로드한 뒤 build와 migration을 수행하고 `saammaago-app`, `saammaago-llm` systemd 서비스를 등록한다.
+
+production에서는 [`backend/src/app.ts`](backend/src/app.ts)가 [`frontend/dist`](frontend/dist)를 정적으로 제공하고 SPA 경로를 `index.html`로 fallback한다. [`frontend/src/api.ts`](frontend/src/api.ts)는 production build에서 현재 origin을 API와 Socket.IO 주소로 사용하므로 외부에는 TCP 80만 공개한다. GCP VPC ingress TCP 80 허용은 별도로 필요하다.
+
+상태와 로그:
+
+```bash
+sudo systemctl status saammaago-app saammaago-llm
+sudo journalctl -u saammaago-app -f
+sudo journalctl -u saammaago-llm -f
+```
+
 ### 로컬 LLM 서버 실행
 
 이미 받은 GGUF 모델을 쓰는 경우:
@@ -621,6 +641,7 @@ npm test
 | 관리자 인증 | `npm test` 중 [`backend/tests/admin-auth.test.ts`](backend/tests/admin-auth.test.ts) | [`backend/src/routes/adminRoutes.ts`](backend/src/routes/adminRoutes.ts), [`backend/src/utils/adminBitmap.ts`](backend/src/utils/adminBitmap.ts) | Vitest 결과 | 64×64 1-bit 가짜 QR BMP 생성, 올바른 키 로그인, 다른 키와 잘못된 크기 거부, Bearer token 보호를 검증한다. 2026-06-12에는 수동 HTTP 검증만 통과했다. |
 | backend health | `curl.exe http://localhost:4000/api/health` | [`backend/src/app.ts`](backend/src/app.ts) | `{ ok: true }` | backend 서버가 떠 있는지 확인한다. |
 | local LLM health | `curl.exe http://127.0.0.1:8010/health` | [`local-llm/server.py`](local-llm/server.py) | `{ ok: true, model: ... }` | 모델 로드와 FastAPI 서버 상태를 확인한다. 실제 실행은 확인 필요. |
+| GCP production | Debian VM에서 `sudo bash deploy/debian-gcp.sh` | [`deploy/debian-gcp.sh`](deploy/debian-gcp.sh), [`backend/src/app.ts`](backend/src/app.ts), [`frontend/src/api.ts`](frontend/src/api.ts) | systemd 서비스, HTTP 80 응답 | `/api/health`, `/`, `/achrai/`, Socket.IO와 재부팅 후 자동 시작을 확인한다. |
 | QR 가입/로그인 수동 검증 | frontend에서 가입 후 QR payload로 로그인 | [`frontend/src/components/AuthPanel.tsx`](frontend/src/components/AuthPanel.tsx), [`backend/src/utils/qrPayload.ts`](backend/src/utils/qrPayload.ts) | `sessionId`, `userId`, 초기 assistant greeting | QR payload가 정상 생성/복원되는지 본다. |
 | reactive 채팅 | 메시지 입력 후 assistant 메시지 수신 | [`ChatPanel`](frontend/src/components/ChatPanel.tsx), [`scheduleReactivePlan`](backend/src/runtime/reactivePlanner.ts) | socket `message`, `presence` | 입력 직후 202가 오고, 지연 후 assistant 메시지가 socket으로 오는지 확인한다. |
 | typing 중 개입 방지 | 긴 문장을 입력하며 typing 상태 유지 | [`sendTyping`](frontend/src/components/ChatPanel.tsx), [`isUserTyping`](backend/src/db/sqlitePresenceEvents.ts) | assistant 응답 지연 | 사용자가 입력 중일 때 메시지가 발송되지 않아야 한다. |

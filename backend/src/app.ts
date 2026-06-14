@@ -1,7 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import cors from 'cors';
 import express, { type Request, type Response } from 'express';
 import { createProvider } from './adapters/index.js';
 import { config } from './config.js';
+import { findRepoRoot } from './db/common.js';
 import { createStore } from './db/index.js';
 import { MessageGenerator } from './engine/messageGenerator.js';
 import { ConversationOrchestrator } from './engine/orchestrator.js';
@@ -75,6 +78,27 @@ export function createApp(options: CreateAppOptions = {}): AppServices {
     scheduleReactivePlan: reactive.scheduleReactivePlan
   });
   registerAdminRoutes(app, store, adminBitmap);
+
+  if (process.env.NODE_ENV === 'production') {
+    const frontendDist = path.join(findRepoRoot(process.cwd()), 'frontend', 'dist');
+    if (!fs.existsSync(path.join(frontendDist, 'index.html'))) {
+      throw new Error(`Frontend build is missing: ${frontendDist}`);
+    }
+
+    app.use(express.static(frontendDist));
+    app.use((req, res, next) => {
+      const isBackendPath =
+        req.path === '/api' ||
+        req.path.startsWith('/api/') ||
+        req.path === '/socket.io' ||
+        req.path.startsWith('/socket.io/');
+      if (req.method !== 'GET' || isBackendPath) {
+        next();
+        return;
+      }
+      res.sendFile(path.join(frontendDist, 'index.html'));
+    });
+  }
 
   app.use((err: unknown, _req: Request, res: Response, _next: express.NextFunction) => {
     console.error(err);

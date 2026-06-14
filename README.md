@@ -185,6 +185,59 @@ http://192.168.0.12:5173
 - API와 소켓은 접속한 호스트 IP 기준으로 자동 연결됩니다.
 - 접속이 안 되면 Windows 방화벽에서 5173, 4000 포트를 허용해야 합니다.
 
+## GCP Debian 한 줄 배포
+
+Debian 기반 Compute Engine VM에 저장소를 clone한 뒤, 저장소 루트에서 아래 명령 하나를 실행합니다.
+
+```bash
+sudo bash deploy/debian-gcp.sh
+```
+
+스크립트는 다음 작업을 자동으로 수행합니다.
+
+- Node.js 20, Python venv, C/C++ 빌드 도구 설치
+- npm/Python 의존성 설치
+- Qwen2.5 1.5B Q4 GGUF 모델 자동 다운로드
+- SQLite migration과 production build 실행
+- `saammaago-app`, `saammaago-llm` systemd 서비스 등록
+- 프론트, API, Socket.IO를 HTTP 80번 포트에서 함께 제공
+- VM 재부팅 후 서비스 자동 시작
+
+첫 실행은 `llama-cpp-python` 빌드와 GGUF 다운로드 때문에 오래 걸릴 수 있습니다. 완료되면 출력된 주소 또는 다음 주소로 접속합니다.
+
+```text
+http://GCP_외부_IP
+```
+
+포트 번호는 입력하지 않습니다. GCP 콘솔에서 VM의 **HTTP 트래픽 허용**을 켜거나, VPC 방화벽에 TCP 80 ingress 규칙을 별도로 만들어야 합니다. 배포 스크립트는 VM 내부 설정만 처리하며 GCP 프로젝트의 VPC 방화벽은 변경하지 않습니다.
+
+권장 VM 메모리는 8GB 이상이며 최소 4GB가 필요합니다. 관리자 키는 배포 후 다음 경로에서 확인합니다.
+
+```text
+runtime/achrai-admin-key.bmp
+```
+
+### 서비스 운영
+
+```bash
+sudo systemctl status saammaago-app saammaago-llm
+sudo journalctl -u saammaago-app -f
+sudo journalctl -u saammaago-llm -f
+sudo systemctl restart saammaago-app saammaago-llm
+```
+
+코드를 업데이트한 뒤에는 `git pull` 후 배포 명령을 다시 실행하면 build와 service 설정을 갱신합니다.
+
+### 서비스 제거
+
+```bash
+sudo systemctl disable --now saammaago-app saammaago-llm
+sudo rm -f /etc/systemd/system/saammaago-app.service /etc/systemd/system/saammaago-llm.service
+sudo systemctl daemon-reload
+```
+
+서비스 제거 명령은 저장소, SQLite 데이터베이스, 다운로드한 GGUF 모델은 삭제하지 않습니다.
+
 ## 기술 스택
 
 - Frontend: React, TypeScript, Vite, Zustand, socket.io-client
