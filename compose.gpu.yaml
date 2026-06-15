@@ -1,0 +1,7 @@
+services:
+  llm:
+    build:
+      target: gpu
+    environment:
+      HF_N_GPU_LAYERS: ${HF_N_GPU_LAYERS:--1}
+    gpus: all

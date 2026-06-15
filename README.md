@@ -79,7 +79,7 @@
 | Python 가상환경 활성화 | `.\.venv-llm\Scripts\Activate.ps1` | `source .venv-llm/bin/activate` |
 | LLM 실행 | `npm run llm:server:windows` | `npm run llm:server:debian` |
 | 앱 개발 실행 | `npm run dev` | `npm run dev` |
-| production 자동 배포 | 해당 없음 | `sudo bash deploy/debian-gcp.sh` |
+| Docker production 실행 | `docker compose up -d --build` | `docker compose up -d --build` |
 
 ### Windows 로컬 실행
 
@@ -234,58 +234,105 @@ curl http://127.0.0.1:4000/api/health
 
 기본 접속 주소는 Windows와 동일하게 `http://localhost:5173`이며, 관리자 화면은 `http://localhost:5173/achrai/`입니다.
 
-## GCP Debian 한 줄 배포
+## Docker production 실행
 
-Debian 기반 Compute Engine VM에 저장소를 clone한 뒤, 저장소 루트에서 아래 명령 하나를 실행합니다.
+Docker 설정은 미리 준비되어 있지만 아직 실제 image build, container 실행, GGUF 다운로드까지 검증한 상태는 아닙니다. 나중에 Windows에서는 Docker Desktop, Debian에서는 Docker Engine과 Docker Compose v2를 설치한 뒤 저장소 루트에서 실행합니다.
+
+- Windows: Docker Desktop을 설치하고 Linux container 모드와 WSL 2 backend를 사용합니다.
+- Debian: Docker Engine과 Docker Compose plugin을 설치합니다. 일반 사용자에게 Docker 권한이 없으면 명령 앞에 `sudo`를 붙입니다.
+
+설치 확인:
 
 ```bash
-sudo bash deploy/debian-gcp.sh
+docker --version
+docker compose version
 ```
 
-스크립트는 다음 작업을 자동으로 수행합니다.
+기본 CPU 실행:
 
-- Node.js 20, Python venv, C/C++ 빌드 도구 설치
-- npm/Python 의존성 설치
-- Qwen2.5 1.5B Q4 GGUF 모델 자동 다운로드
-- SQLite migration과 production build 실행
-- `saammaago-app`, `saammaago-llm` systemd 서비스 등록
-- 프론트, API, Socket.IO를 HTTP 80번 포트에서 함께 제공
-- VM 재부팅 후 서비스 자동 시작
+```bash
+docker compose up -d --build
+```
 
-첫 실행은 `llama-cpp-python` 빌드와 GGUF 다운로드 때문에 오래 걸릴 수 있습니다. 완료되면 출력된 주소 또는 다음 주소로 접속합니다.
+`app`과 `llm` 컨테이너가 함께 시작됩니다. LLM이 정상 상태가 된 뒤 앱이 시작되며, 첫 실행은 `llama-cpp-python` build와 약 1GB GGUF 다운로드 때문에 오래 걸릴 수 있습니다.
+
+기본 접속 주소:
 
 ```text
-http://GCP_외부_IP
+http://localhost
+http://서버_IP
 ```
 
-포트 번호는 입력하지 않습니다. GCP 콘솔에서 VM의 **HTTP 트래픽 허용**을 켜거나, VPC 방화벽에 TCP 80 ingress 규칙을 별도로 만들어야 합니다. 배포 스크립트는 VM 내부 설정만 처리하며 GCP 프로젝트의 VPC 방화벽은 변경하지 않습니다.
+### NVIDIA GPU 실행
 
-권장 VM 메모리는 8GB 이상이며 최소 4GB가 필요합니다. 관리자 키는 배포 후 다음 경로에서 확인합니다.
-
-```text
-runtime/achrai-admin-key.bmp
-```
-
-### 서비스 운영
+NVIDIA driver와 NVIDIA Container Toolkit이 준비된 Windows 또는 Debian 호스트에서만 사용합니다.
 
 ```bash
-sudo systemctl status saammaago-app saammaago-llm
-sudo journalctl -u saammaago-app -f
-sudo journalctl -u saammaago-llm -f
-sudo systemctl restart saammaago-app saammaago-llm
+docker compose -f compose.yaml -f compose.gpu.yaml up -d --build
 ```
 
-코드를 업데이트한 뒤에는 `git pull` 후 배포 명령을 다시 실행하면 build와 service 설정을 갱신합니다.
+GPU override는 CUDA용 LLM image를 만들고 기본적으로 모든 model layer를 GPU에 올립니다. GPU 메모리가 부족하면 `HF_N_GPU_LAYERS`를 더 작은 양수로 지정합니다.
 
-### 서비스 제거
+### 포트 변경
+
+기본 공개 포트는 80입니다. 이미 사용 중이면 다음처럼 8080으로 변경합니다.
+
+Windows PowerShell:
+
+```powershell
+$env:APP_PORT=8080
+docker compose up -d --build
+```
+
+Debian Bash:
 
 ```bash
-sudo systemctl disable --now saammaago-app saammaago-llm
-sudo rm -f /etc/systemd/system/saammaago-app.service /etc/systemd/system/saammaago-llm.service
-sudo systemctl daemon-reload
+APP_PORT=8080 docker compose up -d --build
 ```
 
-서비스 제거 명령은 저장소, SQLite 데이터베이스, 다운로드한 GGUF 모델은 삭제하지 않습니다.
+이 경우 `http://localhost:8080`으로 접속합니다. 조정 가능한 값은 [`.env.docker.example`](.env.docker.example)에도 정리되어 있습니다.
+
+### 상태와 로그
+
+```bash
+docker compose ps
+docker compose logs -f app
+docker compose logs -f llm
+```
+
+`docker compose logs -f`에서 빠져나올 때는 `Ctrl+C`를 누릅니다. 컨테이너는 계속 실행됩니다.
+
+앱 상태 확인:
+
+```powershell
+curl.exe http://localhost/api/health
+```
+
+```bash
+curl http://localhost/api/health
+```
+
+LLM은 외부 포트로 공개하지 않습니다. 컨테이너 내부에서 확인합니다.
+
+```bash
+docker compose exec llm python3 -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8010/health').read().decode())"
+```
+
+### 재시작, 중지와 업데이트
+
+```bash
+docker compose restart
+docker compose down
+docker compose up -d --build
+```
+
+`docker compose down`은 컨테이너와 network만 제거합니다. bind mount로 저장한 다음 파일은 남습니다.
+
+- SQLite: `database/local-dev.db`
+- GGUF cache: `local-llm/models/`
+- 관리자 키: `runtime/achrai-admin-key.bmp`
+
+코드를 업데이트했다면 `docker compose up -d --build`를 다시 실행합니다. 포트 접속이 안 되면 Docker 상태, OS 방화벽, 서버의 외부 방화벽에서 선택한 공개 포트를 확인합니다.
 
 ## 기술 스택
 
@@ -293,6 +340,7 @@ sudo systemctl daemon-reload
 - Backend: Node.js, Express, Socket.IO, TypeScript, Zod
 - Database: SQLite(기본), PostgreSQL(선택)
 - Local LLM: FastAPI, llama-cpp-python, Hugging Face Hub
+- Deployment: Docker, Docker Compose, optional NVIDIA CUDA
 - Test: Vitest, Supertest
 
 ## 프로젝트 의의 / 한계
