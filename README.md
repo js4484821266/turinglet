@@ -81,6 +81,68 @@
 | 앱 개발 실행 | `npm run dev` | `npm run dev` |
 | Docker production 실행 | `docker compose up -d --build` | `docker compose up -d --build` |
 
+### `.env` 설정
+
+로컬 실행은 저장소 루트의 `.env`를 읽습니다. 처음에는 운영체제에 맞는 명령으로 예시 파일을 복사합니다.
+
+Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env -Force
+```
+
+Debian Bash:
+
+```bash
+cp .env.example .env
+```
+
+#### MockProvider로 실행
+
+별도 GGUF 모델이나 Python LLM 서버 없이 규칙 기반 응답으로 앱을 실행합니다. UI, 인증, DB, 메시지 전송 흐름을 빠르게 개발하거나 테스트할 때 사용합니다.
+
+```env
+LLM_PROVIDER=mock
+MOCK_PROVIDER=true
+```
+
+이 모드에서는 LLM 서버를 실행할 필요 없이 `npm run dev`만 실행하면 됩니다.
+
+#### 로컬 GGUF 모델로 실행
+
+백엔드가 FastAPI LLM 서버를 호출하도록 설정합니다.
+
+```env
+LLM_PROVIDER=hf-local
+MOCK_PROVIDER=false
+HF_LOCAL_URL=http://127.0.0.1:8010
+HF_LOCAL_TIMEOUT_MS=30000
+```
+
+이미 받은 GGUF 파일을 사용할 때:
+
+```env
+HF_MODEL_PATH=C:/models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
+HF_ALLOW_MODEL_DOWNLOAD=false
+```
+
+Debian에서는 `HF_MODEL_PATH=/home/user/models/model.gguf`처럼 Linux 경로를 사용합니다.
+
+Hugging Face에서 자동 다운로드하도록 허용할 때:
+
+```env
+HF_MODEL_PATH=
+HF_ALLOW_MODEL_DOWNLOAD=true
+HF_MODEL_CACHE_DIR=./local-llm/models
+HF_MODEL_REPO=bartowski/Qwen2.5-1.5B-Instruct-GGUF
+HF_MODEL_FILE=Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
+HF_N_GPU_LAYERS=0
+```
+
+`LLM_PROVIDER`가 현재 provider 선택의 기준입니다. `MOCK_PROVIDER`는 이전 설정과의 호환을 위해 남아 있으며, `LLM_PROVIDER`가 없거나 올바르지 않을 때만 provider 선택에 영향을 줍니다. 다만 `hf-local` 사용 중 LLM 요청이 실패하거나 timeout이 발생하면 서비스 중단을 피하기 위해 내부적으로 `MockProvider` 응답을 fallback으로 사용합니다.
+
+그 밖의 포트, SQLite 경로, 응답 시간과 선제 발화 설정은 [`.env.example`](.env.example)을 기준으로 조정합니다. `.env`에는 비밀값이나 환경별 경로가 들어갈 수 있으므로 Git에 커밋하지 않습니다.
+
 ### Windows 로컬 실행
 
 #### 1) 의존성 설치
@@ -95,12 +157,7 @@ npm install
 Copy-Item .env.example .env -Force
 ```
 
-`.env`에서 아래 값을 확인합니다.
-
-```env
-LLM_PROVIDER=hf-local
-HF_LOCAL_URL=http://127.0.0.1:8010
-```
+위의 `.env` 설정에서 `mock` 또는 `hf-local` 모드를 선택합니다. `mock`이면 다음 LLM 설치·실행 단계는 건너뜁니다.
 
 #### 3) 로컬 LLM 서버 실행
 
@@ -111,20 +168,7 @@ python -m pip install --upgrade pip
 pip install -r local-llm/requirements.txt
 ```
 
-로컬 LLM 서버는 모델 파일을 자동 다운로드하지 않습니다. 이미 받은 GGUF 모델이 있으면 `.env`에 경로를 지정합니다.
-
-```env
-HF_MODEL_PATH=C:/models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
-```
-
-명시적으로 Hugging Face 다운로드를 허용하려면 아래 값을 `.env`에 설정합니다. 기본 cache 위치는 repo 내부 `local-llm/models`입니다.
-
-```env
-HF_ALLOW_MODEL_DOWNLOAD=true
-HF_MODEL_CACHE_DIR=./local-llm/models
-HF_MODEL_REPO=bartowski/Qwen2.5-1.5B-Instruct-GGUF
-HF_MODEL_FILE=Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
-```
+로컬 LLM 서버는 `.env`의 `HF_MODEL_PATH`를 우선 사용하며, `HF_ALLOW_MODEL_DOWNLOAD=true`일 때만 모델을 다운로드합니다.
 
 ```powershell
 npm run llm:server:windows
@@ -247,6 +291,8 @@ Docker 설정은 미리 준비되어 있지만 아직 실제 image build, contai
 docker --version
 docker compose version
 ```
+
+Docker Compose는 앱 provider를 `hf-local`로 고정하고 LLM 컨테이너를 함께 실행합니다. Docker의 공개 포트와 모델 파일을 바꾸려면 [`.env.docker.example`](.env.docker.example)을 `.env`로 복사한 뒤 값을 수정하거나, 실행 명령 앞에서 환경 변수를 지정합니다. 로컬 개발용 `.env`가 이미 있다면 덮어쓰지 말고 필요한 `APP_PORT`, `HF_MODEL_REPO`, `HF_MODEL_FILE`, `HF_N_GPU_LAYERS` 값만 추가합니다.
 
 기본 CPU 실행:
 
