@@ -77,8 +77,8 @@ app = FastAPI(title="Saammaago Local LLM")
 # Prefer an explicit local GGUF path. Downloading is opt-in so server startup does
 # not write model files to a user cache or the repo without a clear setting.
 MODEL_PATH = os.getenv("HF_MODEL_PATH", "").strip()
-MODEL_REPO = os.getenv("HF_MODEL_REPO", "bartowski/Qwen2.5-1.5B-Instruct-GGUF")
-MODEL_FILE = os.getenv("HF_MODEL_FILE", "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf")
+MODEL_REPO = os.getenv("HF_MODEL_REPO", "Qwen/Qwen2.5-0.5B-Instruct-GGUF")
+MODEL_FILE = os.getenv("HF_MODEL_FILE", "qwen2.5-0.5b-instruct-q4_k_m.gguf")
 ALLOW_MODEL_DOWNLOAD = _truthy(os.getenv("HF_ALLOW_MODEL_DOWNLOAD"))
 MODEL_CACHE_DIR = _repo_relative_path(os.getenv("HF_MODEL_CACHE_DIR", "./local-llm/models"))
 HOST = os.getenv("HF_LOCAL_HOST", "127.0.0.1")

@@ -123,7 +123,7 @@ HF_LOCAL_TIMEOUT_MS=30000
 이미 받은 GGUF 파일을 사용할 때:
 
 ```env
-HF_MODEL_PATH=C:/models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
+HF_MODEL_PATH=C:/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
 HF_ALLOW_MODEL_DOWNLOAD=false
 ```
 
@@ -135,10 +135,12 @@ Hugging Face에서 자동 다운로드하도록 허용할 때:
 HF_MODEL_PATH=
 HF_ALLOW_MODEL_DOWNLOAD=true
 HF_MODEL_CACHE_DIR=./local-llm/models
-HF_MODEL_REPO=bartowski/Qwen2.5-1.5B-Instruct-GGUF
-HF_MODEL_FILE=Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
+HF_MODEL_REPO=Qwen/Qwen2.5-0.5B-Instruct-GGUF
+HF_MODEL_FILE=qwen2.5-0.5b-instruct-q4_k_m.gguf
 HF_N_GPU_LAYERS=0
 ```
+
+이 설정은 `huggingface-cli download Qwen/Qwen2.5-0.5B-Instruct-GGUF --include "Qwen2.5-0.5B-Instruct-Q4_K_M.gguf" --local-dir ./models`와 같은 목적의 모델 준비를 앱 실행 시점에 수행합니다. 구현은 `huggingface_hub.hf_hub_download()`를 사용하므로 실제 저장 경로는 `HF_MODEL_CACHE_DIR` 아래 Hugging Face cache 구조가 됩니다.
 
 `LLM_PROVIDER`가 현재 provider 선택의 기준입니다. `MOCK_PROVIDER`는 이전 설정과의 호환을 위해 남아 있으며, `LLM_PROVIDER`가 없거나 올바르지 않을 때만 provider 선택에 영향을 줍니다. 다만 `hf-local` 사용 중 LLM 요청이 실패하거나 timeout이 발생하면 서비스 중단을 피하기 위해 내부적으로 `MockProvider` 응답을 fallback으로 사용합니다.
 

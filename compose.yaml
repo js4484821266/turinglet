@@ -11,8 +11,8 @@ services:
       HF_LOCAL_PORT: 8010
       HF_ALLOW_MODEL_DOWNLOAD: "true"
       HF_MODEL_CACHE_DIR: /models
-      HF_MODEL_REPO: ${HF_MODEL_REPO:-bartowski/Qwen2.5-1.5B-Instruct-GGUF}
-      HF_MODEL_FILE: ${HF_MODEL_FILE:-Qwen2.5-1.5B-Instruct-Q4_K_M.gguf}
+      HF_MODEL_REPO: ${HF_MODEL_REPO:-Qwen/Qwen2.5-0.5B-Instruct-GGUF}
+      HF_MODEL_FILE: ${HF_MODEL_FILE:-qwen2.5-0.5b-instruct-q4_k_m.gguf}
       HF_N_GPU_LAYERS: "0"
     volumes:
       - ./local-llm/models:/models

@@ -500,10 +500,10 @@ graph TD
 | `HF_LOCAL_TIMEOUT_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | HF provider timeout | `30000` | 길면 느린 모델을 더 기다리고, 짧으면 fallback이 빨라진다. |
 | `VITE_BACKEND_ORIGIN` | [`frontend/src/api.ts`](frontend/src/api.ts), [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx) | 프론트에서 backend origin override | 미설정 시 현재 host의 `:4000` | LAN/배포 환경에서 API 주소를 바꾼다. |
 | `HF_MODEL_PATH` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | 로컬 GGUF 모델 파일 경로 | 빈 값 | 설정하면 자동 다운로드 없이 해당 파일을 로드한다. |
-| `HF_ALLOW_MODEL_DOWNLOAD` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face 모델 다운로드 허용 여부 | `false` | `true`일 때만 네트워크 다운로드를 시도한다. |
+| `HF_ALLOW_MODEL_DOWNLOAD` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face 모델 다운로드 허용 여부 | `true` | `true`일 때 실행 중 필요한 GGUF를 받는다. |
 | `HF_MODEL_CACHE_DIR` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | 다운로드 모델 cache 위치 | `./local-llm/models` | repo 내부 경로를 기본값으로 사용한다. |
-| `HF_MODEL_REPO` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face model repo | `bartowski/Qwen2.5-1.5B-Instruct-GGUF` | 다운로드 opt-in 시 받을 GGUF repo가 바뀐다. |
-| `HF_MODEL_FILE` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face model file | `Qwen2.5-1.5B-Instruct-Q4_K_M.gguf` | 모델 크기/성능/메모리 요구량이 바뀐다. |
+| `HF_MODEL_REPO` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face model repo | `Qwen/Qwen2.5-0.5B-Instruct-GGUF` | 다운로드 opt-in 시 받을 GGUF repo가 바뀐다. |
+| `HF_MODEL_FILE` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face model file | `qwen2.5-0.5b-instruct-q4_k_m.gguf` | 모델 크기/성능/메모리 요구량이 바뀐다. |
 | `HF_LOCAL_HOST` | [`local-llm/server.py`](local-llm/server.py) | local LLM bind host | `127.0.0.1` | 외부 기기 접근 가능성이 바뀐다. |
 | `HF_LOCAL_PORT` | [`local-llm/server.py`](local-llm/server.py) | local LLM port | `8010` | backend `HF_LOCAL_URL`도 맞춰야 한다. |
 | `HF_N_GPU_LAYERS` | [`local-llm/server.py`](local-llm/server.py), [`compose.gpu.yaml`](compose.gpu.yaml) | GPU에 올릴 GGUF layer 수 | CPU `0`, GPU override `-1` | CUDA image와 NVIDIA GPU가 없으면 `0`을 사용해야 한다. |
@@ -607,7 +607,7 @@ npm run docker:down
 이미 받은 GGUF 모델을 쓰는 경우:
 
 ```env
-HF_MODEL_PATH=C:/models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf
+HF_MODEL_PATH=C:/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
 ```
 
 명시적으로 다운로드를 허용하는 경우:
