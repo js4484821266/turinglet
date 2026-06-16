@@ -83,7 +83,6 @@ ALLOW_MODEL_DOWNLOAD = _truthy(os.getenv("HF_ALLOW_MODEL_DOWNLOAD"))
 MODEL_CACHE_DIR = _repo_relative_path(os.getenv("HF_MODEL_CACHE_DIR", "./local-llm/models"))
 HOST = os.getenv("HF_LOCAL_HOST", "127.0.0.1")
 PORT = int(os.getenv("HF_LOCAL_PORT", "8010"))
-N_GPU_LAYERS = int(os.getenv("HF_N_GPU_LAYERS", "0"))
 
 
 def _resolve_model_path() -> Path:
@@ -125,7 +124,6 @@ llm = Llama(
     model_path=str(_model_path),
     n_ctx=2048,
     n_threads=max(1, (os.cpu_count() or 4) // 2),
-    n_gpu_layers=N_GPU_LAYERS,
     verbose=False,
 )
 

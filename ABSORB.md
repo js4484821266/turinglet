@@ -57,9 +57,6 @@
 | [`tsconfig.base.json`](tsconfig.base.json) | 설정 | 모든 TS 패키지의 공통 compiler option이다. | Medium | strict 설정 포함. |
 | [`run-llm-server.ps1`](run-llm-server.ps1) | 설정/기타 | LLM 서버를 자동 재시작하는 PowerShell 스크립트다. | Medium | Windows 실행 편의. |
 | [`run-llm-server.bat`](run-llm-server.bat) | 설정/기타 | LLM 서버를 자동 재시작하는 batch 스크립트다. | Medium | Windows 실행 편의. |
-| [`Dockerfile`](Dockerfile) | 배포 | Node production build와 앱 runtime image를 정의한다. | High | Docker 앱 image를 만들 수 없다. |
-| [`compose.yaml`](compose.yaml) | 배포 | CPU 기반 앱·LLM 컨테이너, healthcheck, 포트와 bind mount를 정의한다. | High | 한 명령 Docker 실행 구성이 사라진다. |
-| [`compose.gpu.yaml`](compose.gpu.yaml) | 배포 | NVIDIA CUDA LLM target과 GPU 할당을 선택적으로 적용한다. | Medium | GPU 실행 override를 잃는다. |
 
 ## 4. 리소스 인벤토리
 
@@ -88,9 +85,6 @@
 | [`prompt-engineering/proactive-outreach-prompt.md`](prompt-engineering/proactive-outreach-prompt.md) | 문서 | 프롬프트 설계 자료 | 선제 발화 제약 | proactive 메시지 설계 근거가 약해진다. |
 | [`run-llm-server.ps1`](run-llm-server.ps1) | 기타 | LLM 서버 실행 | `npm run llm:server` 자동 재시작 | Windows에서 안정 실행 보조가 사라진다. |
 | [`run-llm-server.bat`](run-llm-server.bat) | 기타 | LLM 서버 실행 | venv 활성화 후 자동 재시작 | batch 기반 실행 보조가 사라진다. |
-| [`.env.docker.example`](.env.docker.example) | 설정 | Docker Compose 변수 참고 | 공개 포트, 모델과 GPU layer 예시 | Docker 설정값 안내가 사라진다. |
-| [`local-llm/Dockerfile`](local-llm/Dockerfile) | 배포 | CPU/CUDA LLM image build | GGUF 서버 Python 의존성과 native build 환경 | LLM 컨테이너를 만들 수 없다. |
-| [`deploy/docker-app-entrypoint.sh`](deploy/docker-app-entrypoint.sh) | 배포 | 앱 컨테이너 시작 | migration 후 backend 실행 | 새 DB에서 앱 시작이 실패한다. |
 | [`screenshots/44444 initial.png`](<screenshots/44444 initial.png>) | 이미지 | 코드 참조 없음 | 초기 화면 검증 이미지로 보임 | 수동 검증 증거가 줄어든다. |
 | [`screenshots/66666 created id.png`](<screenshots/66666 created id.png>) | 이미지 | 코드 참조 없음 | QR/ID 생성 화면 검증 이미지로 보임 | 수동 검증 증거가 줄어든다. |
 | [`screenshots/77777 chat initial.png`](<screenshots/77777 chat initial.png>) | 이미지 | 코드 참조 없음 | 채팅 초기 화면 검증 이미지로 보임 | 수동 검증 증거가 줄어든다. |
@@ -506,7 +500,6 @@ graph TD
 | `HF_MODEL_FILE` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face model file | `qwen2.5-0.5b-instruct-q4_k_m.gguf` | 모델 크기/성능/메모리 요구량이 바뀐다. |
 | `HF_LOCAL_HOST` | [`local-llm/server.py`](local-llm/server.py) | local LLM bind host | `127.0.0.1` | 외부 기기 접근 가능성이 바뀐다. |
 | `HF_LOCAL_PORT` | [`local-llm/server.py`](local-llm/server.py) | local LLM port | `8010` | backend `HF_LOCAL_URL`도 맞춰야 한다. |
-| `HF_N_GPU_LAYERS` | [`local-llm/server.py`](local-llm/server.py), [`compose.gpu.yaml`](compose.gpu.yaml) | GPU에 올릴 GGUF layer 수 | CPU `0`, GPU override `-1` | CUDA image와 NVIDIA GPU가 없으면 `0`을 사용해야 한다. |
 | `BURST_PRESENCE_SEQUENCE` | [`backend/src/adapters/mockProvider.ts`](backend/src/adapters/mockProvider.ts) | multi-message 전송 전 presence 순서 | `typing`, `thinking`, `organizing` | assistant 상태 표시 리듬이 바뀐다. |
 | typing debounce | [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx) | 입력 멈춤 후 typing false 전송 시간 | `4000ms` | 너무 짧으면 사용자가 아직 입력 중인데 false가 될 수 있다. |
 | typing freshness | [`backend/src/db/sqlitePresenceEvents.ts`](backend/src/db/sqlitePresenceEvents.ts), [`backend/src/db/postgresPresenceEvents.ts`](backend/src/db/postgresPresenceEvents.ts) | typing true를 유효하게 보는 시간 | `6000ms` | 너무 길면 assistant 응답이 과하게 지연된다. |
@@ -580,28 +573,6 @@ npm run dev:llm:debian
 
 프론트 dev server는 `0.0.0.0:5173`으로 바인딩되므로 같은 Wi-Fi의 스마트폰에서도 `http://PC의_사설IP:5173`으로 접속할 수 있다. 관리자 화면은 `http://PC의_사설IP:5173/achrai/`를 사용한다.
 
-### Docker production 실행
-
-```bash
-npm run docker:up
-```
-
-[`compose.yaml`](compose.yaml)은 CPU LLM과 production 앱을 분리해 실행한다. 앱 컨테이너는 [`deploy/docker-app-entrypoint.sh`](deploy/docker-app-entrypoint.sh)에서 migration을 먼저 수행하고, LLM healthcheck가 통과한 뒤 시작한다. production Express는 [`frontend/dist`](frontend/dist)를 정적으로 제공하며 API와 Socket.IO는 같은 origin을 사용한다.
-
-NVIDIA GPU 호스트에서는 다음 override를 함께 적용한다.
-
-```bash
-npm run docker:up:gpu
-```
-
-외부에는 `${APP_PORT:-80}`만 공개하고 LLM 8010은 Compose network 내부에서만 사용한다. `database`, `local-llm/models`, `runtime`은 bind mount로 호스트에 남는다. 이 Docker 구성은 정적으로 준비한 상태이며 실제 image build와 container 실행은 아직 확인하지 않았다.
-
-```bash
-npm run docker:ps
-npm run docker:logs
-npm run docker:down
-```
-
 ### 로컬 LLM 서버 실행
 
 이미 받은 GGUF 모델을 쓰는 경우:
@@ -658,7 +629,6 @@ npm test
 | 관리자 인증 | `npm test` 중 [`backend/tests/admin-auth.test.ts`](backend/tests/admin-auth.test.ts) | [`backend/src/routes/adminRoutes.ts`](backend/src/routes/adminRoutes.ts), [`backend/src/utils/adminBitmap.ts`](backend/src/utils/adminBitmap.ts) | Vitest 결과 | 64×64 1-bit 가짜 QR BMP 생성, 올바른 키 로그인, 다른 키와 잘못된 크기 거부, Bearer token 보호를 검증한다. 2026-06-12에는 수동 HTTP 검증만 통과했다. |
 | backend health | `curl.exe http://localhost:4000/api/health` | [`backend/src/app.ts`](backend/src/app.ts) | `{ ok: true }` | backend 서버가 떠 있는지 확인한다. |
 | local LLM health | `curl.exe http://127.0.0.1:8010/health` | [`local-llm/server.py`](local-llm/server.py) | `{ ok: true, model: ... }` | 모델 로드와 FastAPI 서버 상태를 확인한다. 실제 실행은 확인 필요. |
-| Docker production | `npm run docker:up` | [`compose.yaml`](compose.yaml), [`Dockerfile`](Dockerfile), [`local-llm/Dockerfile`](local-llm/Dockerfile) | app·llm health와 HTTP 응답 | 실제 실행 시 `/api/health`, `/`, `/achrai/`, Socket.IO와 bind mount 보존을 확인한다. 현재는 미실행 상태다. |
 | QR 가입/로그인 수동 검증 | frontend에서 가입 후 QR payload로 로그인 | [`frontend/src/components/AuthPanel.tsx`](frontend/src/components/AuthPanel.tsx), [`backend/src/utils/qrPayload.ts`](backend/src/utils/qrPayload.ts) | `sessionId`, `userId`, 초기 assistant greeting | QR payload가 정상 생성/복원되는지 본다. |
 | reactive 채팅 | 메시지 입력 후 assistant 메시지 수신 | [`ChatPanel`](frontend/src/components/ChatPanel.tsx), [`scheduleReactivePlan`](backend/src/runtime/reactivePlanner.ts) | socket `message`, `presence` | 입력 직후 202가 오고, 지연 후 assistant 메시지가 socket으로 오는지 확인한다. |
 | typing 중 개입 방지 | 긴 문장을 입력하며 typing 상태 유지 | [`sendTyping`](frontend/src/components/ChatPanel.tsx), [`isUserTyping`](backend/src/db/sqlitePresenceEvents.ts) | assistant 응답 지연 | 사용자가 입력 중일 때 메시지가 발송되지 않아야 한다. |

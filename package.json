@@ -26,12 +26,7 @@
     "seed": "npm run seed -w database",
     "llm:server": "npm run llm:server:windows",
     "llm:server:windows": "cross-env KMP_DUPLICATE_LIB_OK=TRUE .\\.venv-llm\\Scripts\\python.exe local-llm/server.py",
-    "llm:server:debian": "KMP_DUPLICATE_LIB_OK=TRUE ./.venv-llm/bin/python local-llm/server.py",
-    "docker:up": "docker compose up -d --build",
-    "docker:up:gpu": "docker compose -f compose.yaml -f compose.gpu.yaml up -d --build",
-    "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f app llm",
-    "docker:ps": "docker compose ps"
+    "llm:server:debian": "KMP_DUPLICATE_LIB_OK=TRUE ./.venv-llm/bin/python local-llm/server.py"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.22.0",

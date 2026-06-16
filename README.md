@@ -79,8 +79,6 @@
 | Python 가상환경 활성화 | `.\.venv-llm\Scripts\Activate.ps1` | `source .venv-llm/bin/activate` |
 | Mock 개발 실행 | `npm run dev:mock` | `npm run dev:mock` |
 | GGUF 개발 실행 | `npm run dev:llm:windows` | `npm run dev:llm:debian` |
-| Docker CPU 실행 | `npm run docker:up` | `npm run docker:up` |
-| Docker GPU 실행 | `npm run docker:up:gpu` | `npm run docker:up:gpu` |
 
 ### `.env` 설정
 
@@ -137,7 +135,6 @@ HF_ALLOW_MODEL_DOWNLOAD=true
 HF_MODEL_CACHE_DIR=./local-llm/models
 HF_MODEL_REPO=Qwen/Qwen2.5-0.5B-Instruct-GGUF
 HF_MODEL_FILE=qwen2.5-0.5b-instruct-q4_k_m.gguf
-HF_N_GPU_LAYERS=0
 ```
 
 이 설정은 `huggingface-cli download Qwen/Qwen2.5-0.5B-Instruct-GGUF --include "Qwen2.5-0.5B-Instruct-Q4_K_M.gguf" --local-dir ./models`와 같은 목적의 모델 준비를 앱 실행 시점에 수행합니다. 구현은 `huggingface_hub.hf_hub_download()`를 사용하므로 실제 저장 경로는 `HF_MODEL_CACHE_DIR` 아래 Hugging Face cache 구조가 됩니다.
@@ -304,114 +301,12 @@ curl http://127.0.0.1:4000/api/health
 
 기본 접속 주소는 Windows와 동일하게 `http://localhost:5173`이며, 관리자 화면은 `http://localhost:5173/achrai/`입니다.
 
-## Docker production 실행
-
-Docker 설정은 미리 준비되어 있지만 아직 실제 image build, container 실행, GGUF 다운로드까지 검증한 상태는 아닙니다. 나중에 Windows에서는 Docker Desktop, Debian에서는 Docker Engine과 Docker Compose v2를 설치한 뒤 저장소 루트에서 실행합니다.
-
-- Windows: Docker Desktop을 설치하고 Linux container 모드와 WSL 2 backend를 사용합니다.
-- Debian: Docker Engine과 Docker Compose plugin을 설치합니다. 일반 사용자에게 Docker 권한이 없으면 명령 앞에 `sudo`를 붙입니다.
-
-설치 확인:
-
-```bash
-docker --version
-docker compose version
-```
-
-Docker Compose는 앱 provider를 `hf-local`로 고정하고 LLM 컨테이너를 함께 실행합니다. Docker의 공개 포트와 모델 파일을 바꾸려면 [`.env.docker.example`](.env.docker.example)을 `.env`로 복사한 뒤 값을 수정하거나, 실행 명령 앞에서 환경 변수를 지정합니다. 로컬 개발용 `.env`가 이미 있다면 덮어쓰지 말고 필요한 `APP_PORT`, `HF_MODEL_REPO`, `HF_MODEL_FILE`, `HF_N_GPU_LAYERS` 값만 추가합니다.
-
-기본 CPU 실행:
-
-```bash
-npm run docker:up
-```
-
-`app`과 `llm` 컨테이너가 함께 시작됩니다. LLM이 정상 상태가 된 뒤 앱이 시작되며, 첫 실행은 `llama-cpp-python` build와 약 1GB GGUF 다운로드 때문에 오래 걸릴 수 있습니다.
-
-기본 접속 주소:
-
-```text
-http://localhost
-http://서버_IP
-```
-
-### NVIDIA GPU 실행
-
-NVIDIA driver와 NVIDIA Container Toolkit이 준비된 Windows 또는 Debian 호스트에서만 사용합니다.
-
-```bash
-npm run docker:up:gpu
-```
-
-GPU override는 CUDA용 LLM image를 만들고 기본적으로 모든 model layer를 GPU에 올립니다. GPU 메모리가 부족하면 `HF_N_GPU_LAYERS`를 더 작은 양수로 지정합니다.
-
-### 포트 변경
-
-기본 공개 포트는 80입니다. 이미 사용 중이면 다음처럼 8080으로 변경합니다.
-
-Windows PowerShell:
-
-```powershell
-$env:APP_PORT=8080
-npm run docker:up
-```
-
-Debian Bash:
-
-```bash
-APP_PORT=8080 npm run docker:up
-```
-
-이 경우 `http://localhost:8080`으로 접속합니다. 조정 가능한 값은 [`.env.docker.example`](.env.docker.example)에도 정리되어 있습니다.
-
-### 상태와 로그
-
-```bash
-npm run docker:ps
-npm run docker:logs
-```
-
-`docker compose logs -f`에서 빠져나올 때는 `Ctrl+C`를 누릅니다. 컨테이너는 계속 실행됩니다.
-
-앱 상태 확인:
-
-```powershell
-curl.exe http://localhost/api/health
-```
-
-```bash
-curl http://localhost/api/health
-```
-
-LLM은 외부 포트로 공개하지 않습니다. 컨테이너 내부에서 확인합니다.
-
-```bash
-docker compose exec llm python3 -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8010/health').read().decode())"
-```
-
-### 재시작, 중지와 업데이트
-
-```bash
-docker compose restart
-npm run docker:down
-npm run docker:up
-```
-
-`docker compose down`은 컨테이너와 network만 제거합니다. bind mount로 저장한 다음 파일은 남습니다.
-
-- SQLite: `database/local-dev.db`
-- GGUF cache: `local-llm/models/`
-- 관리자 키: `runtime/achrai-admin-key.bmp`
-
-코드를 업데이트했다면 `npm run docker:up`을 다시 실행합니다. 포트 접속이 안 되면 Docker 상태, OS 방화벽, 서버의 외부 방화벽에서 선택한 공개 포트를 확인합니다.
-
 ## 기술 스택
 
 - Frontend: React, TypeScript, Vite, Zustand, socket.io-client
 - Backend: Node.js, Express, Socket.IO, TypeScript, Zod
 - Database: SQLite(기본), PostgreSQL(선택)
 - Local LLM: FastAPI, llama-cpp-python, Hugging Face Hub
-- Deployment: Docker, Docker Compose, optional NVIDIA CUDA
 - Test: Vitest, Supertest
 
 ## 프로젝트 의의 / 한계
