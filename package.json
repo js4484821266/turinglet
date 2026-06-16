@@ -12,6 +12,9 @@
   "scripts": {
     "predev": "npm run build -w shared && npm run build -w scheduler && npm run build -w database && npm run migrate",
     "dev": "concurrently --kill-others --kill-others-on-fail \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "dev:mock": "cross-env LLM_PROVIDER=mock MOCK_PROVIDER=true npm run dev",
+    "dev:llm:windows": "concurrently --kill-others --kill-others-on-fail \"npm run llm:server:windows\" \"npm run dev\"",
+    "dev:llm:debian": "concurrently --kill-others --kill-others-on-fail \"npm run llm:server:debian\" \"npm run dev\"",
     "dev:server": "npm run dev -w backend",
     "dev:client": "npm run dev -w frontend",
     "dev:desktop": "concurrently --kill-others --kill-others-on-fail \"npm run dev -w backend\" \"npm run dev -w frontend\" \"npm run dev:electron\"",
@@ -23,7 +26,12 @@
     "seed": "npm run seed -w database",
     "llm:server": "npm run llm:server:windows",
     "llm:server:windows": "cross-env KMP_DUPLICATE_LIB_OK=TRUE .\\.venv-llm\\Scripts\\python.exe local-llm/server.py",
-    "llm:server:debian": "KMP_DUPLICATE_LIB_OK=TRUE ./.venv-llm/bin/python local-llm/server.py"
+    "llm:server:debian": "KMP_DUPLICATE_LIB_OK=TRUE ./.venv-llm/bin/python local-llm/server.py",
+    "docker:up": "docker compose up -d --build",
+    "docker:up:gpu": "docker compose -f compose.yaml -f compose.gpu.yaml up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f app llm",
+    "docker:ps": "docker compose ps"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.22.0",

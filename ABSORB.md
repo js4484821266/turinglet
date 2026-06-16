@@ -527,7 +527,7 @@ graph TD
 
 ### 설치 명령
 
-Windows PowerShell과 Debian Bash는 Python 가상환경 경로와 활성화 명령이 다르다. 앱 개발 명령은 공통으로 `npm run dev`를 사용하고, LLM은 각각 `npm run llm:server:windows`, `npm run llm:server:debian`을 사용한다.
+Windows PowerShell과 Debian Bash는 Python 가상환경 경로와 활성화 명령이 다르다. 설치와 `.env` 준비는 별도로 수행하고, 실행 표면은 루트 [`package.json`](package.json)의 npm scripts로 통일한다. mock 개발은 `npm run dev:mock`, Windows GGUF 개발은 `npm run dev:llm:windows`, Debian GGUF 개발은 `npm run dev:llm:debian`을 사용한다.
 
 ```powershell
 npm install
@@ -561,12 +561,16 @@ npm run migrate
 ### 개발 실행
 
 ```powershell
-npm run dev
+npm run dev:mock
+npm run dev:llm:windows
 ```
 
-루트 [`package.json`](package.json)의 `predev`가 먼저 [`shared`](shared), [`scheduler`](scheduler), [`database`](database)를 build하고 migration을 실행한 뒤, [`backend`](backend)와 [`frontend`](frontend)를 동시에 실행한다.
+```bash
+npm run dev:mock
+npm run dev:llm:debian
+```
 
-Debian 로컬 개발에서는 `.venv-llm/bin/python`을 사용하는 `npm run llm:server:debian`을 실행한다. Windows의 기존 `npm run llm:server`는 호환성을 위해 `npm run llm:server:windows`를 호출한다.
+루트 [`package.json`](package.json)의 `predev`가 먼저 [`shared`](shared), [`scheduler`](scheduler), [`database`](database)를 build하고 migration을 실행한 뒤, [`backend`](backend)와 [`frontend`](frontend)를 동시에 실행한다. `dev:llm:*` 명령은 LLM 서버와 `npm run dev`를 `concurrently --kill-others`로 함께 실행한다.
 
 기본 주소:
 
@@ -579,7 +583,7 @@ Debian 로컬 개발에서는 `.venv-llm/bin/python`을 사용하는 `npm run ll
 ### Docker production 실행
 
 ```bash
-docker compose up -d --build
+npm run docker:up
 ```
 
 [`compose.yaml`](compose.yaml)은 CPU LLM과 production 앱을 분리해 실행한다. 앱 컨테이너는 [`deploy/docker-app-entrypoint.sh`](deploy/docker-app-entrypoint.sh)에서 migration을 먼저 수행하고, LLM healthcheck가 통과한 뒤 시작한다. production Express는 [`frontend/dist`](frontend/dist)를 정적으로 제공하며 API와 Socket.IO는 같은 origin을 사용한다.
@@ -587,16 +591,15 @@ docker compose up -d --build
 NVIDIA GPU 호스트에서는 다음 override를 함께 적용한다.
 
 ```bash
-docker compose -f compose.yaml -f compose.gpu.yaml up -d --build
+npm run docker:up:gpu
 ```
 
 외부에는 `${APP_PORT:-80}`만 공개하고 LLM 8010은 Compose network 내부에서만 사용한다. `database`, `local-llm/models`, `runtime`은 bind mount로 호스트에 남는다. 이 Docker 구성은 정적으로 준비한 상태이며 실제 image build와 container 실행은 아직 확인하지 않았다.
 
 ```bash
-docker compose ps
-docker compose logs -f app
-docker compose logs -f llm
-docker compose down
+npm run docker:ps
+npm run docker:logs
+npm run docker:down
 ```
 
 ### 로컬 LLM 서버 실행
@@ -655,7 +658,7 @@ npm test
 | 관리자 인증 | `npm test` 중 [`backend/tests/admin-auth.test.ts`](backend/tests/admin-auth.test.ts) | [`backend/src/routes/adminRoutes.ts`](backend/src/routes/adminRoutes.ts), [`backend/src/utils/adminBitmap.ts`](backend/src/utils/adminBitmap.ts) | Vitest 결과 | 64×64 1-bit 가짜 QR BMP 생성, 올바른 키 로그인, 다른 키와 잘못된 크기 거부, Bearer token 보호를 검증한다. 2026-06-12에는 수동 HTTP 검증만 통과했다. |
 | backend health | `curl.exe http://localhost:4000/api/health` | [`backend/src/app.ts`](backend/src/app.ts) | `{ ok: true }` | backend 서버가 떠 있는지 확인한다. |
 | local LLM health | `curl.exe http://127.0.0.1:8010/health` | [`local-llm/server.py`](local-llm/server.py) | `{ ok: true, model: ... }` | 모델 로드와 FastAPI 서버 상태를 확인한다. 실제 실행은 확인 필요. |
-| Docker production | `docker compose up -d --build` | [`compose.yaml`](compose.yaml), [`Dockerfile`](Dockerfile), [`local-llm/Dockerfile`](local-llm/Dockerfile) | app·llm health와 HTTP 응답 | 실제 실행 시 `/api/health`, `/`, `/achrai/`, Socket.IO와 bind mount 보존을 확인한다. 현재는 미실행 상태다. |
+| Docker production | `npm run docker:up` | [`compose.yaml`](compose.yaml), [`Dockerfile`](Dockerfile), [`local-llm/Dockerfile`](local-llm/Dockerfile) | app·llm health와 HTTP 응답 | 실제 실행 시 `/api/health`, `/`, `/achrai/`, Socket.IO와 bind mount 보존을 확인한다. 현재는 미실행 상태다. |
 | QR 가입/로그인 수동 검증 | frontend에서 가입 후 QR payload로 로그인 | [`frontend/src/components/AuthPanel.tsx`](frontend/src/components/AuthPanel.tsx), [`backend/src/utils/qrPayload.ts`](backend/src/utils/qrPayload.ts) | `sessionId`, `userId`, 초기 assistant greeting | QR payload가 정상 생성/복원되는지 본다. |
 | reactive 채팅 | 메시지 입력 후 assistant 메시지 수신 | [`ChatPanel`](frontend/src/components/ChatPanel.tsx), [`scheduleReactivePlan`](backend/src/runtime/reactivePlanner.ts) | socket `message`, `presence` | 입력 직후 202가 오고, 지연 후 assistant 메시지가 socket으로 오는지 확인한다. |
 | typing 중 개입 방지 | 긴 문장을 입력하며 typing 상태 유지 | [`sendTyping`](frontend/src/components/ChatPanel.tsx), [`isUserTyping`](backend/src/db/sqlitePresenceEvents.ts) | assistant 응답 지연 | 사용자가 입력 중일 때 메시지가 발송되지 않아야 한다. |

@@ -77,9 +77,10 @@
 | --- | --- | --- |
 | 환경 파일 생성 | `Copy-Item .env.example .env -Force` | `cp .env.example .env` |
 | Python 가상환경 활성화 | `.\.venv-llm\Scripts\Activate.ps1` | `source .venv-llm/bin/activate` |
-| LLM 실행 | `npm run llm:server:windows` | `npm run llm:server:debian` |
-| 앱 개발 실행 | `npm run dev` | `npm run dev` |
-| Docker production 실행 | `docker compose up -d --build` | `docker compose up -d --build` |
+| Mock 개발 실행 | `npm run dev:mock` | `npm run dev:mock` |
+| GGUF 개발 실행 | `npm run dev:llm:windows` | `npm run dev:llm:debian` |
+| Docker CPU 실행 | `npm run docker:up` | `npm run docker:up` |
+| Docker GPU 실행 | `npm run docker:up:gpu` | `npm run docker:up:gpu` |
 
 ### `.env` 설정
 
@@ -106,7 +107,7 @@ LLM_PROVIDER=mock
 MOCK_PROVIDER=true
 ```
 
-이 모드에서는 LLM 서버를 실행할 필요 없이 `npm run dev`만 실행하면 됩니다.
+이 모드에서는 LLM 서버를 실행할 필요 없이 `npm run dev:mock`만 실행하면 됩니다.
 
 #### 로컬 GGUF 모델로 실행
 
@@ -159,6 +160,12 @@ Copy-Item .env.example .env -Force
 
 위의 `.env` 설정에서 `mock` 또는 `hf-local` 모드를 선택합니다. `mock`이면 다음 LLM 설치·실행 단계는 건너뜁니다.
 
+준비가 끝난 뒤 mock provider로 한 번에 실행:
+
+```powershell
+npm run dev:mock
+```
+
 #### 3) 로컬 LLM 서버 실행
 
 ```powershell
@@ -172,6 +179,12 @@ pip install -r local-llm/requirements.txt
 
 ```powershell
 npm run llm:server:windows
+```
+
+LLM 서버와 앱을 같은 터미널에서 한 번에 실행:
+
+```powershell
+npm run dev:llm:windows
 ```
 
 서버가 예외나 모델 문제로 종료될 때 자동 재시작까지 보고 싶으면 PowerShell 스크립트를 사용할 수 있습니다.
@@ -198,6 +211,8 @@ curl.exe http://127.0.0.1:8010/health
 npm run migrate
 npm run dev
 ```
+
+`npm run dev:mock`과 `npm run dev:llm:windows`는 내부에서 migration과 개발 서버 실행을 함께 처리합니다.
 
 기본 주소
 
@@ -271,6 +286,15 @@ npm run migrate
 npm run dev
 ```
 
+준비가 끝난 뒤 한 줄로 실행하려면 다음 중 하나를 사용합니다.
+
+```bash
+npm run dev:mock
+npm run dev:llm:debian
+```
+
+`dev:mock`은 LLM 서버를 띄우지 않고, `dev:llm:debian`은 LLM 서버와 앱을 같은 터미널에서 함께 실행합니다.
+
 ```bash
 curl http://127.0.0.1:8010/health
 curl http://127.0.0.1:4000/api/health
@@ -297,7 +321,7 @@ Docker Compose는 앱 provider를 `hf-local`로 고정하고 LLM 컨테이너를
 기본 CPU 실행:
 
 ```bash
-docker compose up -d --build
+npm run docker:up
 ```
 
 `app`과 `llm` 컨테이너가 함께 시작됩니다. LLM이 정상 상태가 된 뒤 앱이 시작되며, 첫 실행은 `llama-cpp-python` build와 약 1GB GGUF 다운로드 때문에 오래 걸릴 수 있습니다.
@@ -314,7 +338,7 @@ http://서버_IP
 NVIDIA driver와 NVIDIA Container Toolkit이 준비된 Windows 또는 Debian 호스트에서만 사용합니다.
 
 ```bash
-docker compose -f compose.yaml -f compose.gpu.yaml up -d --build
+npm run docker:up:gpu
 ```
 
 GPU override는 CUDA용 LLM image를 만들고 기본적으로 모든 model layer를 GPU에 올립니다. GPU 메모리가 부족하면 `HF_N_GPU_LAYERS`를 더 작은 양수로 지정합니다.
@@ -327,13 +351,13 @@ Windows PowerShell:
 
 ```powershell
 $env:APP_PORT=8080
-docker compose up -d --build
+npm run docker:up
 ```
 
 Debian Bash:
 
 ```bash
-APP_PORT=8080 docker compose up -d --build
+APP_PORT=8080 npm run docker:up
 ```
 
 이 경우 `http://localhost:8080`으로 접속합니다. 조정 가능한 값은 [`.env.docker.example`](.env.docker.example)에도 정리되어 있습니다.
@@ -341,9 +365,8 @@ APP_PORT=8080 docker compose up -d --build
 ### 상태와 로그
 
 ```bash
-docker compose ps
-docker compose logs -f app
-docker compose logs -f llm
+npm run docker:ps
+npm run docker:logs
 ```
 
 `docker compose logs -f`에서 빠져나올 때는 `Ctrl+C`를 누릅니다. 컨테이너는 계속 실행됩니다.
@@ -368,8 +391,8 @@ docker compose exec llm python3 -c "import urllib.request; print(urllib.request.
 
 ```bash
 docker compose restart
-docker compose down
-docker compose up -d --build
+npm run docker:down
+npm run docker:up
 ```
 
 `docker compose down`은 컨테이너와 network만 제거합니다. bind mount로 저장한 다음 파일은 남습니다.
@@ -378,7 +401,7 @@ docker compose up -d --build
 - GGUF cache: `local-llm/models/`
 - 관리자 키: `runtime/achrai-admin-key.bmp`
 
-코드를 업데이트했다면 `docker compose up -d --build`를 다시 실행합니다. 포트 접속이 안 되면 Docker 상태, OS 방화벽, 서버의 외부 방화벽에서 선택한 공개 포트를 확인합니다.
+코드를 업데이트했다면 `npm run docker:up`을 다시 실행합니다. 포트 접속이 안 되면 Docker 상태, OS 방화벽, 서버의 외부 방화벽에서 선택한 공개 포트를 확인합니다.
 
 ## 기술 스택
 
