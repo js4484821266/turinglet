@@ -301,6 +301,30 @@ curl http://127.0.0.1:4000/api/health
 
 기본 접속 주소는 Windows와 동일하게 `http://localhost:5173`이며, 관리자 화면은 `http://localhost:5173/achrai/`입니다.
 
+### 클라우드 Debian/Ubuntu 한 줄 실행
+
+클라우드 서버에서는 repo를 clone한 뒤 모델 파일을 직접 넣습니다. 이 스크립트는 GGUF나 safetensors를 다운로드하지 않습니다. 현재 LLM 서버는 `llama-cpp-python` 기반이므로 바로 로드할 수 있는 형식은 GGUF입니다. safetensors를 쓰려면 별도 변환 또는 다른 추론 서버가 필요합니다.
+
+기본 위치:
+
+```text
+local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
+```
+
+다른 경로를 쓰려면 절대 경로로 지정합니다.
+
+```bash
+HF_MODEL_PATH=/absolute/path/to/model.gguf bash deploy/cloud-run.sh
+```
+
+기본 위치에 모델을 넣었다면 저장소 루트에서 다음 한 줄로 의존성 설치, `.env` 설정, Python venv 준비, 앱 실행까지 처리합니다.
+
+```bash
+bash deploy/cloud-run.sh
+```
+
+스크립트는 Node.js와 Python 자체를 설치하지 않습니다. 클라우드 이미지에 Node.js 20 이상, npm, Python 3, venv, C/C++ build toolchain이 준비되어 있어야 합니다. 실행 후 접속 주소는 `http://서버_IP:5173`입니다. 방화벽에서 TCP 5173과 4000을 열어야 합니다.
+
 ## 기술 스택
 
 - Frontend: React, TypeScript, Vite, Zustand, socket.io-client

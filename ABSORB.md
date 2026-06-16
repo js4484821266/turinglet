@@ -57,6 +57,7 @@
 | [`tsconfig.base.json`](tsconfig.base.json) | 설정 | 모든 TS 패키지의 공통 compiler option이다. | Medium | strict 설정 포함. |
 | [`run-llm-server.ps1`](run-llm-server.ps1) | 설정/기타 | LLM 서버를 자동 재시작하는 PowerShell 스크립트다. | Medium | Windows 실행 편의. |
 | [`run-llm-server.bat`](run-llm-server.bat) | 설정/기타 | LLM 서버를 자동 재시작하는 batch 스크립트다. | Medium | Windows 실행 편의. |
+| [`deploy/cloud-run.sh`](deploy/cloud-run.sh) | 배포 | Debian/Ubuntu 클라우드에서 의존성 설치와 로컬 LLM 실행을 한 명령으로 처리한다. | Medium | 클라우드 수동 실행 절차가 길어진다. |
 
 ## 4. 리소스 인벤토리
 
@@ -85,6 +86,7 @@
 | [`prompt-engineering/proactive-outreach-prompt.md`](prompt-engineering/proactive-outreach-prompt.md) | 문서 | 프롬프트 설계 자료 | 선제 발화 제약 | proactive 메시지 설계 근거가 약해진다. |
 | [`run-llm-server.ps1`](run-llm-server.ps1) | 기타 | LLM 서버 실행 | `npm run llm:server` 자동 재시작 | Windows에서 안정 실행 보조가 사라진다. |
 | [`run-llm-server.bat`](run-llm-server.bat) | 기타 | LLM 서버 실행 | venv 활성화 후 자동 재시작 | batch 기반 실행 보조가 사라진다. |
+| [`deploy/cloud-run.sh`](deploy/cloud-run.sh) | 배포 | Debian/Ubuntu 클라우드 실행 | 모델 파일 존재 확인, `.env` 갱신, npm/Python 의존성 설치, `npm run dev:llm:debian` 실행 | clone 후 한 명령 실행 경로를 잃는다. |
 | [`screenshots/44444 initial.png`](<screenshots/44444 initial.png>) | 이미지 | 코드 참조 없음 | 초기 화면 검증 이미지로 보임 | 수동 검증 증거가 줄어든다. |
 | [`screenshots/66666 created id.png`](<screenshots/66666 created id.png>) | 이미지 | 코드 참조 없음 | QR/ID 생성 화면 검증 이미지로 보임 | 수동 검증 증거가 줄어든다. |
 | [`screenshots/77777 chat initial.png`](<screenshots/77777 chat initial.png>) | 이미지 | 코드 참조 없음 | 채팅 초기 화면 검증 이미지로 보임 | 수동 검증 증거가 줄어든다. |
@@ -516,7 +518,7 @@ graph TD
 - Node.js와 npm: 정확한 최소 버전은 코드에서 확인 필요.
 - Python venv: [`local-llm/requirements.txt`](local-llm/requirements.txt)에 필요한 Python 패키지가 정의되어 있다. 정확한 최소 Python 버전은 확인 필요.
 - SQLite: [`better-sqlite3`](backend/package.json)을 사용한다.
-- 로컬 LLM을 쓰려면 로컬 GGUF 모델 경로(`HF_MODEL_PATH`)가 필요하다. Hugging Face 다운로드는 `HF_ALLOW_MODEL_DOWNLOAD=true`를 명시한 경우에만 시도한다.
+- 로컬 LLM을 쓰려면 로컬 GGUF 모델 경로(`HF_MODEL_PATH`)가 필요하다. 클라우드 한 줄 실행은 GGUF/safetensors를 다운로드하지 않고, 사용자가 직접 넣은 GGUF 파일 경로를 검사한다.
 
 ### 설치 명령
 
@@ -564,6 +566,8 @@ npm run dev:llm:debian
 ```
 
 루트 [`package.json`](package.json)의 `predev`가 먼저 [`shared`](shared), [`scheduler`](scheduler), [`database`](database)를 build하고 migration을 실행한 뒤, [`backend`](backend)와 [`frontend`](frontend)를 동시에 실행한다. `dev:llm:*` 명령은 LLM 서버와 `npm run dev`를 `concurrently --kill-others`로 함께 실행한다.
+
+Debian/Ubuntu 클라우드에서는 모델 파일을 `local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf`에 직접 넣은 뒤 `bash deploy/cloud-run.sh`를 실행한다. 다른 경로를 쓰면 `HF_MODEL_PATH=/absolute/path/to/model.gguf bash deploy/cloud-run.sh`로 지정한다.
 
 기본 주소:
 
