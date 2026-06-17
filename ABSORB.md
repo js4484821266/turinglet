@@ -43,7 +43,7 @@
 | [`database`](database) | 코드/설정 | SQLite migration, seed, DB 경로 해석 유틸이 있다. | High | 로컬 DB 초기화 담당. |
 | [`database/migrations/001_init.sql`](database/migrations/001_init.sql) | 데이터 | users, sessions, messages, proactive_events 등 테이블을 만든다. | High | DB 스키마 원본이다. |
 | [`local-llm`](local-llm) | 코드 | FastAPI 기반 로컬 LLM 서버를 제공한다. | Medium | 실행 시 필수로 사용한다. |
-| [`local-llm/server.py`](local-llm/server.py) | 코드 | `/health`, `/v1/generate`를 제공하고 GGUF 모델을 로드한다. | Medium | 명시적 로컬 모델 경로를 우선하고, 다운로드는 opt-in이다. |
+| [`local-llm/server.py`](local-llm/server.py) | 코드 | `/health`, `/v1/generate`를 제공하고 GGUF 모델을 로드한다. | Medium | 명시적 로컬 모델 경로가 필수다. |
 | [`prompt-engineering`](prompt-engineering) | 문서 | 시스템/침묵/안전/rapport/proactive 프롬프트 설계 문서. | Medium | 현재 코드에서 직접 import되는 것은 확인되지 않았다. |
 | [`screenshots`](screenshots) | 이미지 | README 또는 수동 검증용으로 보이는 앱 화면 이미지. | Low | 코드에서 참조는 확인되지 않았다. |
 | [`test-cases`](test-cases) | 이미지 | `.gitignore` 대상 수동 테스트 이미지 모음. | Low | 로컬에는 있으나 git 추적 대상은 아니다. |
@@ -235,7 +235,7 @@ flowchart LR
 - backend caller: [`HuggingFaceLocalProvider.invoke`](backend/src/adapters/hfLocalProvider.ts)
 - local server: [`local-llm/server.py`](local-llm/server.py)
 - model 경로: [`local-llm/server.py`](local-llm/server.py)는 `HF_MODEL_PATH`가 가리키는 로컬 GGUF 파일을 먼저 사용한다.
-- 명시적 다운로드: `HF_ALLOW_MODEL_DOWNLOAD=true`일 때만 `HF_MODEL_REPO`, `HF_MODEL_FILE`을 사용해 Hugging Face에서 받으며, cache 기본 위치는 repo 내부 `./local-llm/models`다.
+- 모델 준비: 실행 전에 GGUF 파일을 직접 받아 두고 `HF_MODEL_PATH`로 지정해야 한다. 앱 실행 중 자동 다운로드는 하지 않는다.
 
 ## 7. 모듈 의존 관계
 
@@ -437,7 +437,7 @@ graph TD
 - 관련 함수 또는 클래스: [`HuggingFaceLocalProvider.invoke`](backend/src/adapters/hfLocalProvider.ts), [`generateMultiMessagePlan`](backend/src/adapters/hfLocalProvider.ts)
 - 어떤 입력을 받는가: task와 payload
 - 어떤 출력을 만드는가: 검증된 `MultiMessagePlan`, summary, silence meaning
-- 시간 또는 성능상 주의할 점: [`hfLocalTimeoutMs`](backend/src/config.ts) timeout이 걸리면 요청이 실패한다. 로컬 LLM은 첫 로딩과 모델 다운로드가 무겁다.
+- 시간 또는 성능상 주의할 점: [`hfLocalTimeoutMs`](backend/src/config.ts) timeout이 걸리면 요청이 실패한다. 로컬 LLM은 첫 로딩이 무겁다.
 - 개선 가능성: `nextState` enum 검증과 task별 structured output 검증을 더 엄격히 할 수 있다.
 
 ### QR payload encoding 로직
@@ -482,10 +482,6 @@ graph TD
 | `HF_LOCAL_STARTUP_WAIT_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts), [`backend/src/runtime/llmHealth.ts`](backend/src/runtime/llmHealth.ts) | backend 시작 전 LLM health 대기 시간 | `120000` | LLM 로딩이 이 시간을 넘으면 backend가 시작하지 않는다. |
 | `VITE_BACKEND_ORIGIN` | [`frontend/src/api.ts`](frontend/src/api.ts), [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx) | 프론트에서 backend origin override | 미설정 시 현재 host의 `:4000` | LAN/배포 환경에서 API 주소를 바꾼다. |
 | `HF_MODEL_PATH` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | 로컬 GGUF 모델 파일 경로 | 빈 값 | 설정하면 자동 다운로드 없이 해당 파일을 로드한다. |
-| `HF_ALLOW_MODEL_DOWNLOAD` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face 모델 다운로드 허용 여부 | `false` | `true`일 때만 로컬 파일 실패 후 필요한 GGUF를 받는다. |
-| `HF_MODEL_CACHE_DIR` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | 다운로드 모델 cache 위치 | `./local-llm/models` | repo 내부 경로를 기본값으로 사용한다. |
-| `HF_MODEL_REPO` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face model repo | `Qwen/Qwen2.5-0.5B-Instruct-GGUF` | 다운로드 opt-in 시 받을 GGUF repo가 바뀐다. |
-| `HF_MODEL_FILE` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face model file | `qwen2.5-0.5b-instruct-q4_k_m.gguf` | 모델 크기/성능/메모리 요구량이 바뀐다. |
 | `HF_LOCAL_HOST` | [`local-llm/server.py`](local-llm/server.py) | local LLM bind host | `127.0.0.1` | 외부 기기 접근 가능성이 바뀐다. |
 | `HF_LOCAL_PORT` | [`local-llm/server.py`](local-llm/server.py) | local LLM port | `8010` | backend `HF_LOCAL_URL`도 맞춰야 한다. |
 | typing debounce | [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx) | 입력 멈춤 후 typing false 전송 시간 | `4000ms` | 너무 짧으면 사용자가 아직 입력 중인데 false가 될 수 있다. |
@@ -503,7 +499,7 @@ graph TD
 - Node.js와 npm: 정확한 최소 버전은 코드에서 확인 필요.
 - Python venv: [`local-llm/requirements.txt`](local-llm/requirements.txt)에 필요한 Python 패키지가 정의되어 있다. 정확한 최소 Python 버전은 확인 필요.
 - SQLite: [`better-sqlite3`](backend/package.json)을 사용한다.
-- 로컬 LLM은 필수다. 기본 실행은 로컬 GGUF 모델 경로(`HF_MODEL_PATH`)를 검사하고, `HF_ALLOW_MODEL_DOWNLOAD=true`를 명시한 경우에만 Hugging Face 다운로드 경로를 허용한다.
+- 로컬 LLM은 필수다. 기본 실행은 로컬 GGUF 모델 경로(`HF_MODEL_PATH`)를 검사하고, 파일이 없으면 시작하지 않는다.
 
 ### 설치 명령
 
@@ -528,7 +524,7 @@ pip install -r local-llm/requirements.txt
 Copy-Item .env.example .env -Force
 ```
 
-로컬 LLM은 필수다. `HF_LOCAL_URL=http://127.0.0.1:8010`을 기준으로 backend가 health check를 기다리며, `HF_MODEL_PATH`에 유효한 GGUF를 지정하거나 `HF_ALLOW_MODEL_DOWNLOAD=true`와 올바른 `HF_MODEL_REPO`/`HF_MODEL_FILE`을 지정해야 한다.
+로컬 LLM은 필수다. `HF_LOCAL_URL=http://127.0.0.1:8010`을 기준으로 backend가 health check를 기다리며, `HF_MODEL_PATH`에 유효한 GGUF를 지정해야 한다.
 
 ### DB migration
 
@@ -550,7 +546,7 @@ npm run dev:llm:debian
 
 루트 [`package.json`](package.json)의 `predev`가 먼저 [`shared`](shared), [`scheduler`](scheduler), [`database`](database)를 build하고 migration을 실행한 뒤, [`backend`](backend)와 [`frontend`](frontend)를 동시에 실행한다. `dev:llm:*` 명령은 LLM 서버와 `npm run dev`를 `concurrently --kill-others`로 함께 실행한다.
 
-Debian/Ubuntu 클라우드에서는 모델 파일을 `local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf`에 직접 넣은 뒤 `sudo bash deploy/cloud-run.sh`를 실행하는 방식을 기본으로 한다. README에는 `huggingface-cli`, `curl`, `wget`으로 기본 GGUF를 받는 명령을 기록했다. 다른 경로를 쓰면 `sudo env HF_MODEL_PATH=/absolute/path/to/model.gguf bash deploy/cloud-run.sh`로 지정한다. `HF_ALLOW_MODEL_DOWNLOAD=true`를 명시한 경우에는 LLM 서버가 Hugging Face 다운로드를 시도할 수 있다. 스크립트는 production build 후 `saammaago-llm`, `saammaago-app` systemd 서비스를 등록한다. 앱은 `NODE_ENV=production`, `PORT=80`, `node backend/dist/src/server.js`로 실행되어 `http://서버_IP`에서 프론트와 API를 함께 제공한다. 종료는 `sudo systemctl stop saammaago-app saammaago-llm`을 사용한다.
+Debian/Ubuntu 클라우드에서는 모델 파일을 `local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf`에 직접 넣은 뒤 `sudo bash deploy/cloud-run.sh`를 실행한다. README에는 `huggingface-cli`, `curl`, `wget`으로 기본 GGUF를 받는 명령을 기록했다. 다른 경로를 쓰면 `sudo env HF_MODEL_PATH=/absolute/path/to/model.gguf bash deploy/cloud-run.sh`로 지정한다. 스크립트는 production build 후 `saammaago-llm`, `saammaago-app` systemd 서비스를 등록한다. 앱은 `NODE_ENV=production`, `PORT=80`, `node backend/dist/src/server.js`로 실행되어 `http://서버_IP`에서 프론트와 API를 함께 제공한다. 종료는 `sudo systemctl stop saammaago-app saammaago-llm`을 사용한다.
 
 기본 주소:
 
@@ -566,13 +562,6 @@ Debian/Ubuntu 클라우드에서는 모델 파일을 `local-llm/models/qwen2.5-0
 
 ```env
 HF_MODEL_PATH=C:/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
-```
-
-명시적으로 다운로드를 허용하는 경우:
-
-```env
-HF_ALLOW_MODEL_DOWNLOAD=true
-HF_MODEL_CACHE_DIR=./local-llm/models
 ```
 
 ```powershell
@@ -666,7 +655,7 @@ GitHub Copilot과 Codex를 활용해 구현 속도를 높였고, 구조 이해, 
 - [`database/migrations/001_init.sql`](database/migrations/001_init.sql)에 `safety_flags` 테이블이 있지만, 현재 코드에서 insert/query 사용은 확인되지 않았다.
 - [`backend/src/runtime/reactivePlanner.ts`](backend/src/runtime/reactivePlanner.ts)의 timer 기반 plan은 메모리 안에만 있다. 서버 재시작 시 pending assistant message와 reactive plan은 사라진다.
 - [`queuePlanMessages`](backend/src/runtime/messageQueue.ts)는 send 직전에 typing이면 message send를 skip한다. 그런데 proactive event는 queue 직후 기록되어 실제 발송 실패와 기록이 어긋날 수 있다.
-- [`local-llm/server.py`](local-llm/server.py)는 시작 시 모델을 로드하므로 `HF_MODEL_PATH`가 없고 다운로드 opt-in도 꺼져 있으면 서버가 시작되지 않는다.
+- [`local-llm/server.py`](local-llm/server.py)는 시작 시 모델을 로드하므로 `HF_MODEL_PATH`가 없거나 파일이 유효하지 않으면 서버가 시작되지 않는다.
 - [`backend/src/rateLimit.ts`](backend/src/rateLimit.ts)는 in-memory IP bucket이다. 프로세스 재시작 시 초기화되고, 여러 서버 인스턴스에서는 공유되지 않는다.
 
 ## 17. 다음 개선 과제

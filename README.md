@@ -109,24 +109,21 @@ HF_LOCAL_STARTUP_WAIT_MS=120000
 
 ```env
 HF_MODEL_PATH=C:/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
-HF_ALLOW_MODEL_DOWNLOAD=false
 ```
 
 Debian에서는 `HF_MODEL_PATH=/home/user/models/model.gguf`처럼 Linux 경로를 사용합니다.
 
-Hugging Face에서 자동 다운로드하도록 허용할 때:
+모델 파일은 실행 전에 직접 받아 둡니다. 예를 들어 기본 Qwen GGUF를 repo 내부 기본 위치에 받을 때:
 
-```env
-HF_MODEL_PATH=
-HF_ALLOW_MODEL_DOWNLOAD=true
-HF_MODEL_CACHE_DIR=./local-llm/models
-HF_MODEL_REPO=Qwen/Qwen2.5-0.5B-Instruct-GGUF
-HF_MODEL_FILE=qwen2.5-0.5b-instruct-q4_k_m.gguf
+```powershell
+huggingface-cli download Qwen/Qwen2.5-0.5B-Instruct-GGUF qwen2.5-0.5b-instruct-q4_k_m.gguf --local-dir local-llm/models --local-dir-use-symlinks False
 ```
 
-이 설정은 `huggingface-cli download Qwen/Qwen2.5-0.5B-Instruct-GGUF --include "Qwen2.5-0.5B-Instruct-Q4_K_M.gguf" --local-dir ./models`와 같은 목적의 모델 준비를 앱 실행 시점에 수행합니다. 구현은 `huggingface_hub.hf_hub_download()`를 사용하므로 실제 저장 경로는 `HF_MODEL_CACHE_DIR` 아래 Hugging Face cache 구조가 됩니다.
+```bash
+curl -L -o local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf
+```
 
-모델 검사는 로컬 경로를 먼저 봅니다. `HF_MODEL_PATH`가 유효한 `.gguf` 파일이면 그 파일을 로드합니다. 로컬 경로가 비었거나 유효하지 않은 경우에는 `HF_ALLOW_MODEL_DOWNLOAD=true`일 때만 `HF_MODEL_REPO`와 `HF_MODEL_FILE`로 Hugging Face 다운로드를 시도합니다. 두 조건 모두 실패하면 실행은 중단됩니다. safetensors는 현재 `llama-cpp-python` 경로에서 직접 로드하지 않으므로 GGUF로 변환해야 합니다.
+모델 검사는 `HF_MODEL_PATH`만 봅니다. 해당 경로가 유효한 `.gguf` 파일이 아니면 실행은 중단됩니다. 앱 실행 중 자동 다운로드는 하지 않습니다. safetensors는 현재 `llama-cpp-python` 경로에서 직접 로드하지 않으므로 GGUF로 변환해야 합니다.
 
 그 밖의 포트, SQLite 경로, 응답 시간과 선제 발화 설정은 [`.env.example`](.env.example)을 기준으로 조정합니다. `.env`에는 비밀값이나 환경별 경로가 들어갈 수 있으므로 Git에 커밋하지 않습니다.
 
@@ -144,7 +141,7 @@ npm install
 Copy-Item .env.example .env -Force
 ```
 
-위의 `.env` 설정에서 유효한 GGUF 파일 경로나 Hugging Face 다운로드 설정을 준비합니다. 모델 준비가 끝나지 않으면 실행은 실패합니다.
+위의 `.env` 설정에서 유효한 GGUF 파일 경로를 준비합니다. 모델 준비가 끝나지 않으면 실행은 실패합니다.
 
 #### 3) 로컬 LLM 서버 실행
 
@@ -155,7 +152,7 @@ python -m pip install --upgrade pip
 pip install -r local-llm/requirements.txt
 ```
 
-로컬 LLM 서버는 `.env`의 `HF_MODEL_PATH`를 우선 사용하며, `HF_ALLOW_MODEL_DOWNLOAD=true`일 때만 모델을 다운로드합니다.
+로컬 LLM 서버는 `.env`의 `HF_MODEL_PATH`만 사용합니다. 해당 경로에 유효한 GGUF 파일이 없으면 서버가 시작되지 않습니다.
 
 ```powershell
 npm run llm:server:windows
@@ -251,7 +248,7 @@ python -m pip install --upgrade pip
 pip install -r local-llm/requirements.txt
 ```
 
-`.env`의 모델 설정은 Windows와 같습니다. GGUF 파일 경로를 `HF_MODEL_PATH`로 지정하거나, `HF_ALLOW_MODEL_DOWNLOAD=true`로 자동 다운로드를 허용합니다.
+`.env`의 모델 설정은 Windows와 같습니다. GGUF 파일을 직접 받은 뒤 그 경로를 `HF_MODEL_PATH`로 지정합니다.
 
 터미널 하나에서 LLM 서버를 실행합니다.
 
@@ -272,7 +269,7 @@ npm run dev
 npm run dev:llm:debian
 ```
 
-`dev:llm:debian`은 LLM 서버와 앱을 같은 터미널에서 함께 실행합니다. 모델 로드 또는 다운로드가 실패하면 전체 실행이 중단됩니다.
+`dev:llm:debian`은 LLM 서버와 앱을 같은 터미널에서 함께 실행합니다. 모델 파일이 없거나 로드에 실패하면 전체 실행이 중단됩니다.
 
 ```bash
 curl http://127.0.0.1:8010/health
@@ -283,7 +280,7 @@ curl http://127.0.0.1:4000/api/health
 
 ### 클라우드 Debian/Ubuntu 한 줄 실행
 
-클라우드 서버에서는 repo를 clone한 뒤 모델 파일을 직접 넣는 방식을 기본으로 사용합니다. `HF_ALLOW_MODEL_DOWNLOAD=true`를 명시하지 않으면 스크립트는 GGUF나 safetensors를 다운로드하지 않습니다. 현재 LLM 서버는 `llama-cpp-python` 기반이므로 바로 로드할 수 있는 형식은 GGUF입니다. safetensors를 쓰려면 별도 변환 또는 다른 추론 서버가 필요합니다.
+클라우드 서버에서는 repo를 clone한 뒤 모델 파일을 직접 넣어야 합니다. 스크립트와 앱은 실행 중 GGUF나 safetensors를 다운로드하지 않습니다. 현재 LLM 서버는 `llama-cpp-python` 기반이므로 바로 로드할 수 있는 형식은 GGUF입니다. safetensors를 쓰려면 별도 변환 또는 다른 추론 서버가 필요합니다.
 
 기본 위치:
 

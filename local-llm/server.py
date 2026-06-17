@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import FastAPI
-from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
 from pydantic import BaseModel
 import uvicorn
@@ -43,10 +42,6 @@ def _load_repo_env() -> None:
         os.environ[key] = value
 
 
-def _truthy(value: str | None) -> bool:
-    return (value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
-
-
 def _repo_relative_path(raw_path: str) -> Path:
     candidate = Path(raw_path).expanduser()
     if candidate.is_absolute():
@@ -74,13 +69,9 @@ class GenerateResponse(BaseModel):
 app = FastAPI(title="Saammaago Local LLM")
 
 
-# Prefer an explicit local GGUF path. Downloading is opt-in so server startup does
-# not write model files to a user cache or the repo without a clear setting.
+# A local GGUF model is required. Startup fails if the configured file is missing
+# or cannot be loaded by llama-cpp-python.
 MODEL_PATH = os.getenv("HF_MODEL_PATH", "").strip()
-MODEL_REPO = os.getenv("HF_MODEL_REPO", "Qwen/Qwen2.5-0.5B-Instruct-GGUF")
-MODEL_FILE = os.getenv("HF_MODEL_FILE", "qwen2.5-0.5b-instruct-q4_k_m.gguf")
-ALLOW_MODEL_DOWNLOAD = _truthy(os.getenv("HF_ALLOW_MODEL_DOWNLOAD"))
-MODEL_CACHE_DIR = _repo_relative_path(os.getenv("HF_MODEL_CACHE_DIR", "./local-llm/models"))
 HOST = os.getenv("HF_LOCAL_HOST", "127.0.0.1")
 PORT = int(os.getenv("HF_LOCAL_PORT", "8010"))
 
@@ -98,52 +89,22 @@ def _validate_local_model_file(local_path: Path) -> None:
         )
 
 
-def _download_model() -> Path:
-    MODEL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    try:
-        downloaded_path = Path(
-            hf_hub_download(
-                repo_id=MODEL_REPO,
-                filename=MODEL_FILE,
-                cache_dir=str(MODEL_CACHE_DIR),
-            )
-        )
-        _validate_local_model_file(downloaded_path)
-        return downloaded_path
-    except Exception as exc:
-        raise RuntimeError(
-            f"Failed to download model '{MODEL_FILE}' from '{MODEL_REPO}'. "
-            "Check your internet connection, set HF_MODEL_PATH to a local GGUF file, "
-            "or adjust HF_MODEL_REPO / HF_MODEL_FILE."
-        ) from exc
-
-
 def _resolve_model_path() -> Path:
-    if MODEL_PATH:
-        local_path = _repo_relative_path(MODEL_PATH)
-        try:
-            _validate_local_model_file(local_path)
-            return local_path
-        except Exception as exc:
-            if not ALLOW_MODEL_DOWNLOAD:
-                raise RuntimeError(
-                    f"HF_MODEL_PATH is not a valid local GGUF model: {local_path}. "
-                    "Set it to a loadable GGUF file, or set HF_ALLOW_MODEL_DOWNLOAD=true "
-                    "with valid HF_MODEL_REPO / HF_MODEL_FILE."
-                ) from exc
-            logger.warning(
-                "Configured HF_MODEL_PATH is not valid; trying Hugging Face download: %s",
-                exc,
-            )
-
-    if not ALLOW_MODEL_DOWNLOAD:
+    if not MODEL_PATH:
         raise RuntimeError(
             "No local model file configured. Set HF_MODEL_PATH to an existing GGUF file. "
-            "To explicitly allow a Hugging Face download, set HF_ALLOW_MODEL_DOWNLOAD=true; "
-            f"the cache directory will be {MODEL_CACHE_DIR}."
+            "This server does not download model files during startup."
         )
 
-    return _download_model()
+    local_path = _repo_relative_path(MODEL_PATH)
+    try:
+        _validate_local_model_file(local_path)
+        return local_path
+    except Exception as exc:
+        raise RuntimeError(
+            f"HF_MODEL_PATH is not a valid local GGUF model: {local_path}. "
+            "Download a GGUF model manually and set HF_MODEL_PATH to that file."
+        ) from exc
 
 
 _model_path = _resolve_model_path()
