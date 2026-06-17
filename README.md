@@ -314,16 +314,53 @@ local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
 다른 경로를 쓰려면 절대 경로로 지정합니다.
 
 ```bash
-HF_MODEL_PATH=/absolute/path/to/model.gguf bash deploy/cloud-run.sh
+sudo env HF_MODEL_PATH=/absolute/path/to/model.gguf bash deploy/cloud-run.sh
 ```
 
-기본 위치에 모델을 넣었다면 저장소 루트에서 다음 한 줄로 의존성 설치, `.env` 설정, Python venv 준비, 앱 실행까지 처리합니다.
+기본 위치에 모델을 넣었다면 저장소 루트에서 다음 한 줄로 의존성 설치, `.env` 설정, Python venv 준비, systemd 서비스 등록과 시작까지 처리합니다.
 
 ```bash
-bash deploy/cloud-run.sh
+sudo bash deploy/cloud-run.sh
 ```
 
-스크립트는 Node.js와 Python 자체를 설치하지 않습니다. 클라우드 이미지에 Node.js 20 이상, npm, Python 3, venv, C/C++ build toolchain이 준비되어 있어야 합니다. 실행 후 접속 주소는 `http://서버_IP:5173`입니다. 방화벽에서 TCP 5173과 4000을 열어야 합니다.
+스크립트는 production build를 만든 뒤 `saammaago-llm`, `saammaago-app` systemd 서비스를 등록합니다. 명령이 끝난 뒤 SSH 터미널을 닫아도 계속 실행됩니다. 앱 서비스는 80번 포트에서 프론트, API, Socket.IO를 함께 제공합니다. 스크립트는 Node.js와 Python 자체를 설치하지 않습니다. 클라우드 이미지에 Node.js 20 이상, npm, Python 3, venv, C/C++ build toolchain, systemd가 준비되어 있어야 합니다. 실행 후 접속 주소는 `http://서버_IP`입니다. 방화벽에서는 TCP 80만 외부에 열면 됩니다.
+
+상태 확인:
+
+```bash
+sudo systemctl status saammaago-app saammaago-llm
+```
+
+로그 확인:
+
+```bash
+sudo journalctl -u saammaago-app -f
+sudo journalctl -u saammaago-llm -f
+```
+
+재시작:
+
+```bash
+sudo systemctl restart saammaago-app saammaago-llm
+```
+
+실행 종료:
+
+```bash
+sudo systemctl stop saammaago-app saammaago-llm
+```
+
+부팅 시 자동 시작 해제:
+
+```bash
+sudo systemctl disable saammaago-app saammaago-llm
+```
+
+로컬 개발 포트인 5173과 4000은 클라우드 production 접속에는 쓰지 않습니다. 클라우드 내부 health check는 다음처럼 확인합니다.
+
+```bash
+curl http://127.0.0.1/api/health
+```
 
 ## 기술 스택
 

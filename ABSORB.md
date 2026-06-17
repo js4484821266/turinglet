@@ -86,7 +86,7 @@
 | [`prompt-engineering/proactive-outreach-prompt.md`](prompt-engineering/proactive-outreach-prompt.md) | 문서 | 프롬프트 설계 자료 | 선제 발화 제약 | proactive 메시지 설계 근거가 약해진다. |
 | [`run-llm-server.ps1`](run-llm-server.ps1) | 기타 | LLM 서버 실행 | `npm run llm:server` 자동 재시작 | Windows에서 안정 실행 보조가 사라진다. |
 | [`run-llm-server.bat`](run-llm-server.bat) | 기타 | LLM 서버 실행 | venv 활성화 후 자동 재시작 | batch 기반 실행 보조가 사라진다. |
-| [`deploy/cloud-run.sh`](deploy/cloud-run.sh) | 배포 | Debian/Ubuntu 클라우드 실행 | 모델 파일 존재 확인, `.env` 갱신, npm/Python 의존성 설치, `npm run dev:llm:debian` 실행 | clone 후 한 명령 실행 경로를 잃는다. |
+| [`deploy/cloud-run.sh`](deploy/cloud-run.sh) | 배포 | Debian/Ubuntu 클라우드 실행 | 모델 파일 존재 확인, `.env` 갱신, npm/Python 의존성 설치, systemd 서비스 등록과 시작 | clone 후 한 명령 실행 경로를 잃는다. |
 | [`screenshots/44444 initial.png`](<screenshots/44444 initial.png>) | 이미지 | 코드 참조 없음 | 초기 화면 검증 이미지로 보임 | 수동 검증 증거가 줄어든다. |
 | [`screenshots/66666 created id.png`](<screenshots/66666 created id.png>) | 이미지 | 코드 참조 없음 | QR/ID 생성 화면 검증 이미지로 보임 | 수동 검증 증거가 줄어든다. |
 | [`screenshots/77777 chat initial.png`](<screenshots/77777 chat initial.png>) | 이미지 | 코드 참조 없음 | 채팅 초기 화면 검증 이미지로 보임 | 수동 검증 증거가 줄어든다. |
@@ -567,7 +567,7 @@ npm run dev:llm:debian
 
 루트 [`package.json`](package.json)의 `predev`가 먼저 [`shared`](shared), [`scheduler`](scheduler), [`database`](database)를 build하고 migration을 실행한 뒤, [`backend`](backend)와 [`frontend`](frontend)를 동시에 실행한다. `dev:llm:*` 명령은 LLM 서버와 `npm run dev`를 `concurrently --kill-others`로 함께 실행한다.
 
-Debian/Ubuntu 클라우드에서는 모델 파일을 `local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf`에 직접 넣은 뒤 `bash deploy/cloud-run.sh`를 실행한다. 다른 경로를 쓰면 `HF_MODEL_PATH=/absolute/path/to/model.gguf bash deploy/cloud-run.sh`로 지정한다.
+Debian/Ubuntu 클라우드에서는 모델 파일을 `local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf`에 직접 넣은 뒤 `sudo bash deploy/cloud-run.sh`를 실행한다. README에는 `huggingface-cli`, `curl`, `wget`으로 기본 GGUF를 받는 명령을 기록했다. 다른 경로를 쓰면 `sudo env HF_MODEL_PATH=/absolute/path/to/model.gguf bash deploy/cloud-run.sh`로 지정한다. 스크립트는 production build 후 `saammaago-llm`, `saammaago-app` systemd 서비스를 등록한다. 앱은 `NODE_ENV=production`, `PORT=80`, `node backend/dist/src/server.js`로 실행되어 `http://서버_IP`에서 프론트와 API를 함께 제공한다. 종료는 `sudo systemctl stop saammaago-app saammaago-llm`을 사용한다.
 
 기본 주소:
 
