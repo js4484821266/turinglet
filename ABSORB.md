@@ -4,7 +4,7 @@
 
 ## 1. 프로젝트 한 문장 요약
 
-삼마고(Saammaago)는 사용자의 메시지 내용뿐 아니라 타이핑 상태, 침묵 시간, 감정 강도, 선제 발화 쿨다운을 함께 보고 “언제, 몇 개의 메시지로, 어떤 톤으로 응답할지”를 조절하는 이벤트 기반 AI 대화 프로토타입이다. 이름은 무엇이든 받아주는 AI에서 대나무숲을 연상하고, 대나무 관련 어휘 중 가장 먼저 떠오른 `죽마고우`의 `죽`을 반대 의미의 `살`로 바꿔 `산마고우`를 만든 뒤, 발음이 동화되어 `삼마고`가 된 작명 과정에서 유래했다.
+삼마고(Saammaago)는 상담 서비스가 아니라, 사용자가 정리되지 않은 말이나 기분도 편하게 털어놓을 수 있는 AI 말동무 프로토타입이다. 사용자의 메시지 내용뿐 아니라 타이핑 상태, 침묵 시간, 감정 강도, 선제 발화 쿨다운을 함께 보고 “언제, 몇 개의 메시지로, 어떤 톤으로 응답할지”를 조절한다. 이름은 무엇이든 받아주는 AI에서 대나무숲을 연상하고, 대나무 관련 어휘 중 가장 먼저 떠오른 `죽마고우`의 `죽`을 반대 의미의 `살`로 바꿔 `산마고우`를 만든 뒤, 발음이 동화되어 `삼마고`가 된 작명 과정에서 유래했다.
 
 제품 표시 이름만 삼마고(Saammaago)로 변경했으며, 기존 디렉터리명과 `@turinglet/*`, `turinglet-id` 같은 내부 패키지·프로토콜 식별자는 호환성을 위해 유지한다.
 
@@ -79,7 +79,7 @@
 | [`backend/database/test-auth.db`](backend/database/test-auth.db) | 데이터 | [`backend/tests/auth-qr.test.ts`](backend/tests/auth-qr.test.ts) | QR 테스트 임시 DB, `.gitignore` 대상 | 테스트 DB가 사라지지만 재생성 가능하다. |
 | [`database/database/local-dev.db`](database/database/local-dev.db) | 데이터 | 로컬 실행 산출물 | 경로 문제로 생긴 database 하위 DB로 보임 | 해당 데이터가 사라진다. 정확한 생성 경로는 확인 필요. |
 | [`local-llm/requirements.txt`](local-llm/requirements.txt) | 설정 | [`local-llm/server.py`](local-llm/server.py) | Python LLM 서버 의존성 목록 | LLM 서버 설치 방법을 잃는다. |
-| [`prompt-engineering/system-prompt.md`](prompt-engineering/system-prompt.md) | 문서 | 프롬프트 설계 자료 | 상담형 assistant 시스템 원칙 | 설계 의도를 잃는다. 현재 코드 직접 참조는 확인 필요. |
+| [`prompt-engineering/system-prompt.md`](prompt-engineering/system-prompt.md) | 문서 | 프롬프트 설계 자료 | 말동무형 assistant 시스템 원칙 | 설계 의도를 잃는다. 현재 코드 직접 참조는 확인 필요. |
 | [`prompt-engineering/silence-interpretation-prompt.md`](prompt-engineering/silence-interpretation-prompt.md) | 문서 | 프롬프트 설계 자료 | 침묵 의미 후보와 operator action 정의 | proactive 설계 근거가 약해진다. 현재 코드 직접 참조는 확인 필요. |
 | [`prompt-engineering/safety-sensitive-response-prompt.md`](prompt-engineering/safety-sensitive-response-prompt.md) | 문서 | 프롬프트 설계 자료 | 안전 민감 응답 원칙 | 안전 대응 설계 자료가 사라진다. 현재 코드 직접 참조는 확인 필요. |
 | [`prompt-engineering/rapport-prompt.md`](prompt-engineering/rapport-prompt.md) | 문서 | 프롬프트 설계 자료 | rapport-first 스타일 기준 | 대화 톤 설계 근거가 약해진다. |
@@ -670,7 +670,7 @@ GitHub Copilot과 Codex를 활용해 구현 속도를 높였고, 구조 이해, 
 | Medium | HF response의 `nextState` enum 검증 강화 | 잘못된 LLM output으로 인한 상태 오염을 줄인다. | [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts), [`shared/src/index.ts`](shared/src/index.ts) |
 | Medium | PostgreSQL migration 경로 추가 | `DB_PROVIDER=postgres`를 실제 운영 후보로 만들 수 있다. | [`database/src/migrate.ts`](database/src/migrate.ts), [`backend/src/db/store.ts`](backend/src/db/store.ts) |
 | Hard | reactive/proactive 정책 평가 지표 추가 | “자연스러운 타이밍”을 정량적으로 비교할 수 있다. | [`backend/src/app.ts`](backend/src/app.ts), [`scheduler/src/index.ts`](scheduler/src/index.ts), [`backend/tests/policy.test.ts`](backend/tests/policy.test.ts) |
-| Hard | 실제 safety-sensitive 감지와 대응 플로우 구현 | 상담형 대화의 안전성을 높인다. | [`database/migrations/001_init.sql`](database/migrations/001_init.sql), [`prompt-engineering/safety-sensitive-response-prompt.md`](prompt-engineering/safety-sensitive-response-prompt.md), [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts) |
+| Hard | 실제 safety-sensitive 감지와 대응 플로우 구현 | 말동무형 대화에서 위기 표현을 일반 잡담처럼 처리하지 않게 한다. | [`database/migrations/001_init.sql`](database/migrations/001_init.sql), [`prompt-engineering/safety-sensitive-response-prompt.md`](prompt-engineering/safety-sensitive-response-prompt.md), [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts) |
 | Hard | 사용자별 대화 속도와 interruption tolerance 학습 | 개인화된 응답 타이밍을 만들 수 있다. | [`backend/src/db/store.ts`](backend/src/db/store.ts), [`scheduler/src/index.ts`](scheduler/src/index.ts) |
 
 ## 작업 완료 요약

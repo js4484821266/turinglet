@@ -105,7 +105,7 @@ export function ChatPanel() {
   return (
     <div className="chat-shell card">
       <header className="chat-head">
-        <h2>관계형 상담 챗 프로토타입</h2>
+        <h2>AI 말동무 프로토타입</h2>
       </header>
 
       <div className="messages">
