@@ -103,6 +103,7 @@ cp .env.example .env
 HF_LOCAL_URL=http://127.0.0.1:8010
 HF_LOCAL_TIMEOUT_MS=30000
 HF_LOCAL_STARTUP_WAIT_MS=120000
+HF_CONTEXT_SIZE=4096
 ```
 
 이미 받은 GGUF 파일을 사용할 때:
@@ -124,6 +125,8 @@ curl -L -o local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf https://huggingfac
 ```
 
 모델 검사는 `HF_MODEL_PATH`만 봅니다. 해당 경로가 유효한 `.gguf` 파일이 아니면 실행은 중단됩니다. 앱 실행 중 자동 다운로드는 하지 않습니다. safetensors는 현재 `llama-cpp-python` 경로에서 직접 로드하지 않으므로 GGUF로 변환해야 합니다.
+
+`HF_CONTEXT_SIZE`는 llama context window입니다. `Requested tokens (...) exceed context window` 오류가 나면 모델 입력이 context보다 크다는 뜻입니다. 현재 서버는 침묵 판단 payload를 짧게 줄이지만, 긴 대화나 큰 prompt를 실험할 때는 `.env`에서 `HF_CONTEXT_SIZE=4096` 이상으로 조정할 수 있습니다.
 
 그 밖의 포트, SQLite 경로, 응답 시간과 선제 발화 설정은 [`.env.example`](.env.example)을 기준으로 조정합니다. `.env`에는 비밀값이나 환경별 경로가 들어갈 수 있으므로 Git에 커밋하지 않습니다.
 

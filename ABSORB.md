@@ -331,7 +331,7 @@ graph TD
 - 관련 리소스: [`local-llm/requirements.txt`](local-llm/requirements.txt), [`run-llm-server.ps1`](run-llm-server.ps1), [`run-llm-server.bat`](run-llm-server.bat)
 - 주요 클래스: [`HuggingFaceLocalProvider`](backend/src/adapters/hfLocalProvider.ts)
 - 주요 함수 또는 메서드: [`createProvider`](backend/src/adapters/index.ts), [`generateMessage`](backend/src/adapters/hfLocalProvider.ts), [`generateMultiMessagePlan`](backend/src/adapters/hfLocalProvider.ts), [`summarizeConversationState`](backend/src/adapters/hfLocalProvider.ts), [`detectUserSilenceMeaning`](backend/src/adapters/hfLocalProvider.ts), [`invoke`](backend/src/adapters/hfLocalProvider.ts)
-- 주요 변수 또는 상수: [`LLMProviderAdapter`](shared/src/index.ts), [`HF_LOCAL_URL`](.env.example), [`HF_LOCAL_TIMEOUT_MS`](.env.example), [`MODEL_REPO`](local-llm/server.py), [`MODEL_FILE`](local-llm/server.py)
+- 주요 변수 또는 상수: [`LLMProviderAdapter`](shared/src/index.ts), [`HF_LOCAL_URL`](.env.example), [`HF_LOCAL_TIMEOUT_MS`](.env.example), [`HF_CONTEXT_SIZE`](.env.example)
 - 입력: snapshot, userText, recentMessages, silenceMeaning
 - 처리: backend 시작 전 [`waitForLocalLlm`](backend/src/runtime/llmHealth.ts)이 LLM health를 기다린다. 이후 provider는 HTTP로 로컬 LLM 서버를 호출하며, 실패하면 오류를 전파한다.
 - 출력: `MultiMessagePlan`, 단일 메시지, emotional summary, silence meaning
@@ -480,6 +480,7 @@ graph TD
 | `HF_LOCAL_URL` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | local LLM endpoint origin | `http://127.0.0.1:8010` | HF provider 호출 대상이 바뀐다. |
 | `HF_LOCAL_TIMEOUT_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | HF provider request timeout | `30000` | 길면 느린 모델 응답을 더 기다리고, 짧으면 요청 실패가 빨라진다. |
 | `HF_LOCAL_STARTUP_WAIT_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts), [`backend/src/runtime/llmHealth.ts`](backend/src/runtime/llmHealth.ts) | backend 시작 전 LLM health 대기 시간 | `120000` | LLM 로딩이 이 시간을 넘으면 backend가 시작하지 않는다. |
+| `HF_CONTEXT_SIZE` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | llama context window | `4096` | 너무 낮으면 `Requested tokens exceed context window` 오류가 난다. |
 | `VITE_BACKEND_ORIGIN` | [`frontend/src/api.ts`](frontend/src/api.ts), [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx) | 프론트에서 backend origin override | 미설정 시 현재 host의 `:4000` | LAN/배포 환경에서 API 주소를 바꾼다. |
 | `HF_MODEL_PATH` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | 로컬 GGUF 모델 파일 경로 | 빈 값 | 설정하면 자동 다운로드 없이 해당 파일을 로드한다. |
 | `HF_LOCAL_HOST` | [`local-llm/server.py`](local-llm/server.py) | local LLM bind host | `127.0.0.1` | 외부 기기 접근 가능성이 바뀐다. |
@@ -487,7 +488,7 @@ graph TD
 | typing debounce | [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx) | 입력 멈춤 후 typing false 전송 시간 | `4000ms` | 너무 짧으면 사용자가 아직 입력 중인데 false가 될 수 있다. |
 | typing freshness | [`backend/src/db/sqlitePresenceEvents.ts`](backend/src/db/sqlitePresenceEvents.ts), [`backend/src/db/postgresPresenceEvents.ts`](backend/src/db/postgresPresenceEvents.ts) | typing true를 유효하게 보는 시간 | `6000ms` | 너무 길면 assistant 응답이 과하게 지연된다. |
 | Electron retry count | [`frontend/electron/main.ts`](frontend/electron/main.ts), [`frontend/electron/main.mjs`](frontend/electron/main.mjs) | Vite URL load retry 횟수 | `30` | 프론트 서버가 늦게 켜질 때 대기 시간이 바뀐다. |
-| local LLM `n_ctx` | [`local-llm/server.py`](local-llm/server.py) | Llama context size | `2048` | 긴 대화 처리 가능량과 메모리 사용량에 영향. |
+| local LLM `n_ctx` | [`local-llm/server.py`](local-llm/server.py) | Llama context size | `HF_CONTEXT_SIZE` | 긴 대화 처리 가능량과 메모리 사용량에 영향. |
 | local LLM `n_threads` | [`local-llm/server.py`](local-llm/server.py) | CPU thread 수 | `os.cpu_count()/2` | 추론 속도와 CPU 점유율에 영향. |
 
 ## 12. 실행 방법
@@ -656,6 +657,7 @@ GitHub Copilot과 Codex를 활용해 구현 속도를 높였고, 구조 이해, 
 - [`backend/src/runtime/reactivePlanner.ts`](backend/src/runtime/reactivePlanner.ts)의 timer 기반 plan은 메모리 안에만 있다. 서버 재시작 시 pending assistant message와 reactive plan은 사라진다.
 - [`queuePlanMessages`](backend/src/runtime/messageQueue.ts)는 send 직전에 typing이면 message send를 skip한다. 그런데 proactive event는 queue 직후 기록되어 실제 발송 실패와 기록이 어긋날 수 있다.
 - [`local-llm/server.py`](local-llm/server.py)는 시작 시 모델을 로드하므로 `HF_MODEL_PATH`가 없거나 파일이 유효하지 않으면 서버가 시작되지 않는다.
+- `Requested tokens (...) exceed context window` 오류는 모델 파일 문제가 아니라 LLM 입력이 `HF_CONTEXT_SIZE`보다 큰 경우다. 침묵 판단은 최근 메시지 5개와 짧은 content만 넘기도록 축약한다.
 - [`backend/src/rateLimit.ts`](backend/src/rateLimit.ts)는 in-memory IP bucket이다. 프로세스 재시작 시 초기화되고, 여러 서버 인스턴스에서는 공유되지 않는다.
 
 ## 17. 다음 개선 과제
