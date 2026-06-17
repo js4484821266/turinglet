@@ -106,22 +106,44 @@ HF_LOCAL_STARTUP_WAIT_MS=120000
 HF_CONTEXT_SIZE=4096
 ```
 
-이미 받은 GGUF 파일을 사용할 때:
+처음에는 작고 비교적 안정적인 instruct GGUF를 받는 편이 낫습니다. 기본 추천 파일은 `Qwen2.5-0.5B-Instruct-Q4_K_M.gguf`입니다. reasoning-distilled 모델이나 `Q2_K`처럼 강하게 압축된 모델은 `<think>` 출력, JSON 형식 실패, 한국어 응답 품질 저하가 더 자주 날 수 있습니다.
 
-```env
-HF_MODEL_PATH=C:/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
-```
+모델 파일은 실행 전에 직접 받아 둡니다. 앱 실행 중 자동 다운로드는 하지 않습니다. repo 내부 기본 위치에 받을 때는 다음 중 하나를 사용합니다.
 
-Debian에서는 `HF_MODEL_PATH=/home/user/models/model.gguf`처럼 Linux 경로를 사용합니다.
-
-모델 파일은 실행 전에 직접 받아 둡니다. 예를 들어 기본 Qwen GGUF를 repo 내부 기본 위치에 받을 때:
+Windows PowerShell:
 
 ```powershell
+New-Item -ItemType Directory -Force local-llm/models
+curl.exe -L -o local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf
+```
+
+Debian Bash:
+
+```bash
+mkdir -p local-llm/models
+curl -L -o local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf
+```
+
+Hugging Face CLI를 이미 설치했다면 다음 명령도 쓸 수 있습니다.
+
+```bash
 huggingface-cli download Qwen/Qwen2.5-0.5B-Instruct-GGUF qwen2.5-0.5b-instruct-q4_k_m.gguf --local-dir local-llm/models --local-dir-use-symlinks False
 ```
 
+받은 뒤 `.env`에 모델 경로를 지정합니다.
+
+```env
+HF_MODEL_PATH=./local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
+```
+
+이미 다른 위치에 받은 GGUF 파일을 사용할 때는 해당 경로를 직접 넣습니다.
+
+```powershell
+HF_MODEL_PATH=C:/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
+```
+
 ```bash
-curl -L -o local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf
+HF_MODEL_PATH=/home/user/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
 ```
 
 모델 검사는 `HF_MODEL_PATH`만 봅니다. 해당 경로가 유효한 `.gguf` 파일이 아니면 실행은 중단됩니다. 앱 실행 중 자동 다운로드는 하지 않습니다. safetensors는 현재 `llama-cpp-python` 경로에서 직접 로드하지 않으므로 GGUF로 변환해야 합니다.

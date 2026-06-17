@@ -547,7 +547,7 @@ npm run dev:llm:debian
 
 루트 [`package.json`](package.json)의 `predev`가 먼저 [`shared`](shared), [`scheduler`](scheduler), [`database`](database)를 build하고 migration을 실행한 뒤, [`backend`](backend)와 [`frontend`](frontend)를 동시에 실행한다. `dev:llm:*` 명령은 LLM 서버와 `npm run dev`를 `concurrently --kill-others`로 함께 실행한다.
 
-Debian/Ubuntu 클라우드에서는 모델 파일을 `local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf`에 직접 넣은 뒤 `sudo bash deploy/cloud-run.sh`를 실행한다. README에는 `huggingface-cli`, `curl`, `wget`으로 기본 GGUF를 받는 명령을 기록했다. 다른 경로를 쓰면 `sudo env HF_MODEL_PATH=/absolute/path/to/model.gguf bash deploy/cloud-run.sh`로 지정한다. 스크립트는 production build 후 `saammaago-llm`, `saammaago-app` systemd 서비스를 등록한다. 앱은 `NODE_ENV=production`, `PORT=80`, `node backend/dist/src/server.js`로 실행되어 `http://서버_IP`에서 프론트와 API를 함께 제공한다. 종료는 `sudo systemctl stop saammaago-app saammaago-llm`을 사용한다.
+Debian/Ubuntu 클라우드에서는 모델 파일을 `local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf`에 직접 넣은 뒤 `sudo bash deploy/cloud-run.sh`를 실행한다. README에는 초기 설정에서 기본 추천 파일(`Qwen2.5-0.5B-Instruct-Q4_K_M.gguf`)과 `curl`, `huggingface-cli` 다운로드 명령을 기록했다. reasoning-distilled 모델이나 `Q2_K` 모델은 형식 준수와 한국어 응답 품질이 불안정할 수 있다. 다른 경로를 쓰면 `sudo env HF_MODEL_PATH=/absolute/path/to/model.gguf bash deploy/cloud-run.sh`로 지정한다. 스크립트는 production build 후 `saammaago-llm`, `saammaago-app` systemd 서비스를 등록한다. 앱은 `NODE_ENV=production`, `PORT=80`, `node backend/dist/src/server.js`로 실행되어 `http://서버_IP`에서 프론트와 API를 함께 제공한다. 종료는 `sudo systemctl stop saammaago-app saammaago-llm`을 사용한다.
 
 기본 주소:
 
