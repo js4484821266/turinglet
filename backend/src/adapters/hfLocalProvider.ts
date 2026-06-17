@@ -1,12 +1,9 @@
 import type { ConversationSnapshot, LLMProviderAdapter, MessageRecord, MultiMessagePlan, SilenceMeaning } from '@turinglet/shared';
 import { config } from '../config.js';
-import { MockProvider } from './mockProvider.js';
 import type { HFResponseEnvelope, HFTask } from './hfLocalTypes.js';
 import { isSilenceMeaning, normalizeMultiMessagePlan } from './hfLocalValidation.js';
 
 export class HuggingFaceLocalProvider implements LLMProviderAdapter {
-  private readonly fallback = new MockProvider();
-
   private async invoke(task: HFTask, payload: Record<string, unknown>): Promise<unknown> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.hfLocalTimeoutMs);
@@ -34,16 +31,9 @@ export class HuggingFaceLocalProvider implements LLMProviderAdapter {
     intent: 'empathy' | 'question' | 'reflection' | 'checkin';
     userText?: string | undefined;
   }): Promise<string> {
-    try {
-      const result = await this.invoke('single_message', input as unknown as Record<string, unknown>);
-      if (typeof result === 'string' && result.trim()) return result.trim();
-    } catch {
-      // Local LLM is optional; mock text keeps the prototype usable offline.
-    }
-    const fallbackInput = input.userText
-      ? { snapshot: input.snapshot, intent: input.intent, userText: input.userText }
-      : { snapshot: input.snapshot, intent: input.intent };
-    return this.fallback.generateMessage(fallbackInput);
+    const result = await this.invoke('single_message', input as unknown as Record<string, unknown>);
+    if (typeof result === 'string' && result.trim()) return result.trim();
+    throw new Error('HF local endpoint returned an invalid single_message result.');
   }
 
   async generateMultiMessagePlan(input: {
@@ -51,88 +41,35 @@ export class HuggingFaceLocalProvider implements LLMProviderAdapter {
     userText?: string | undefined;
     silenceMeaning?: SilenceMeaning;
   }): Promise<MultiMessagePlan> {
-    try {
-      const result = await this.invoke('multi_plan', input as unknown as Record<string, unknown>);
-      const plan = normalizeMultiMessagePlan(result);
-      if (plan) return plan;
-    } catch {
-      // Fall through to lighter fallbacks.
-    }
-
-    const aiFallback = await this.aiSinglePlanFallback({
-      snapshot: input.snapshot,
-      userText: input.userText
-    });
-    if (aiFallback) return aiFallback;
-    const fallbackInput: { snapshot: ConversationSnapshot; userText?: string; silenceMeaning?: SilenceMeaning } = {
-      snapshot: input.snapshot
-    };
-    if (input.userText) fallbackInput.userText = input.userText;
-    if (input.silenceMeaning) fallbackInput.silenceMeaning = input.silenceMeaning;
-    return this.fallback.generateMultiMessagePlan(fallbackInput);
+    const result = await this.invoke('multi_plan', input as unknown as Record<string, unknown>);
+    const plan = normalizeMultiMessagePlan(result);
+    if (plan) return plan;
+    throw new Error('HF local endpoint returned an invalid multi_plan result.');
   }
 
   async summarizeConversationState(input: {
     sessionId: string;
     recentMessages: MessageRecord[];
   }): Promise<{ emotionalIntensity: number; summary: string }> {
-    try {
-      const result = await this.invoke('summary', input as unknown as Record<string, unknown>);
-      if (result && typeof result === 'object') {
-        const obj = result as { emotionalIntensity?: unknown; summary?: unknown };
-        if (typeof obj.emotionalIntensity === 'number' && typeof obj.summary === 'string') {
-          return {
-            emotionalIntensity: Math.max(0, Math.min(10, Math.floor(obj.emotionalIntensity))),
-            summary: obj.summary
-          };
-        }
+    const result = await this.invoke('summary', input as unknown as Record<string, unknown>);
+    if (result && typeof result === 'object') {
+      const obj = result as { emotionalIntensity?: unknown; summary?: unknown };
+      if (typeof obj.emotionalIntensity === 'number' && typeof obj.summary === 'string') {
+        return {
+          emotionalIntensity: Math.max(0, Math.min(10, Math.floor(obj.emotionalIntensity))),
+          summary: obj.summary
+        };
       }
-    } catch {
-      // Mock summary is deterministic enough for local tests.
     }
-
-    return this.fallback.summarizeConversationState(input);
+    throw new Error('HF local endpoint returned an invalid summary result.');
   }
 
   async detectUserSilenceMeaning(input: {
     snapshot: ConversationSnapshot;
     recentMessages: MessageRecord[];
   }): Promise<SilenceMeaning> {
-    try {
-      const result = await this.invoke('silence_meaning', input as unknown as Record<string, unknown>);
-      if (isSilenceMeaning(result)) return result;
-    } catch {
-      // Silence meaning is advisory; fallback keeps proactive flow moving.
-    }
-
-    return this.fallback.detectUserSilenceMeaning(input);
-  }
-
-  private async aiSinglePlanFallback(input: {
-    snapshot: ConversationSnapshot;
-    userText?: string | undefined;
-  }): Promise<MultiMessagePlan | undefined> {
-    try {
-      const messageInput: {
-        snapshot: ConversationSnapshot;
-        intent: 'reflection';
-        userText?: string;
-      } = {
-        snapshot: input.snapshot,
-        intent: 'reflection'
-      };
-      if (input.userText) messageInput.userText = input.userText;
-
-      const text = await this.generateMessage(messageInput);
-      if (!text.trim()) return undefined;
-      return {
-        sendCount: 1,
-        reason: 'hf single-message fallback plan',
-        nextState: 'reflective_pause',
-        messages: [{ content: text, delayMs: 550, presenceBeforeSend: 'typing' }]
-      };
-    } catch {
-      return undefined;
-    }
+    const result = await this.invoke('silence_meaning', input as unknown as Record<string, unknown>);
+    if (isSilenceMeaning(result)) return result;
+    throw new Error('HF local endpoint returned an invalid silence_meaning result.');
   }
 }

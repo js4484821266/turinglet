@@ -19,7 +19,6 @@ async function createTestApp(adminBitmap: Buffer) {
   prepareTempDb(path.resolve(process.cwd(), `../database/${dbName}`));
   process.env.DB_PROVIDER = 'sqlite';
   process.env.SQLITE_PATH = `./database/${dbName}`;
-  process.env.MOCK_PROVIDER = 'true';
   const mod = await import('../src/app.js');
   return mod.createApp({ adminBitmap }).app;
 }

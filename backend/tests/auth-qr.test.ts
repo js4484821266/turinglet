@@ -25,7 +25,6 @@ describe('QR auth', () => {
 
     process.env.DB_PROVIDER = 'sqlite';
     process.env.SQLITE_PATH = './database/test-auth.db';
-    process.env.MOCK_PROVIDER = 'true';
 
     const mod = await import('../src/app.js');
     const { app } = mod.createApp();

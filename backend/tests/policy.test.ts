@@ -1,7 +1,30 @@
 import { evaluateProactiveDecision } from '@turinglet/scheduler';
+import type { LLMProviderAdapter, MultiMessagePlan, SilenceMeaning } from '@turinglet/shared';
 import { describe, expect, it } from 'vitest';
-import { MockProvider } from '../src/adapters/mockProvider.js';
 import { ConversationOrchestrator } from '../src/engine/orchestrator.js';
+
+class TestProvider implements LLMProviderAdapter {
+  async generateMessage(): Promise<string> {
+    return 'test message';
+  }
+
+  async generateMultiMessagePlan(): Promise<MultiMessagePlan> {
+    return {
+      sendCount: 1,
+      reason: 'test plan',
+      nextState: 'waiting_after_empathy',
+      messages: [{ content: 'test message', delayMs: 100, presenceBeforeSend: 'typing' }]
+    };
+  }
+
+  async summarizeConversationState(): Promise<{ emotionalIntensity: number; summary: string }> {
+    return { emotionalIntensity: 5, summary: 'test summary' };
+  }
+
+  async detectUserSilenceMeaning(): Promise<SilenceMeaning> {
+    return 'emotionally_overwhelmed';
+  }
+}
 
 describe('proactive scheduler conditions', () => {
   it('sends short check-in when silence is long and cooldown passed', () => {
@@ -26,7 +49,7 @@ describe('proactive scheduler conditions', () => {
   });
 
   it('does not interject while user is typing', async () => {
-    const orchestrator = new ConversationOrchestrator(new MockProvider());
+    const orchestrator = new ConversationOrchestrator(new TestProvider());
     const plan = await orchestrator.planForUserMessage({
       snapshot: {
         sessionId: 's1',
@@ -44,7 +67,7 @@ describe('proactive scheduler conditions', () => {
   });
 
   it('uses empathy then wait policy for high emotional load silence', async () => {
-    const orchestrator = new ConversationOrchestrator(new MockProvider());
+    const orchestrator = new ConversationOrchestrator(new TestProvider());
     const plan = await orchestrator.planForSilence({
       snapshot: {
         sessionId: 's1',

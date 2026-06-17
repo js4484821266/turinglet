@@ -28,7 +28,7 @@
 | [`backend/src/routes`](backend/src/routes) | 코드 | 인증, 채팅, 관리자 API route를 기능별로 나눈다. | High | API 동작은 여기서 읽는다. |
 | [`backend/src/runtime`](backend/src/runtime) | 코드 | realtime emit, 메시지 큐, reactive planner, proactive loop를 나눈다. | High | 타이머와 Socket.IO 흐름의 중심이다. |
 | [`backend/src/engine`](backend/src/engine) | 코드 | 대화 반응 계획과 침묵 의미 추론 래퍼가 있다. | High | 응답 타이밍 정책의 중심이다. |
-| [`backend/src/adapters`](backend/src/adapters) | 코드 | mock provider와 로컬 HF provider를 선택하고 실행한다. | High | 메시지 생성과 fallback이 여기 있다. |
+| [`backend/src/adapters`](backend/src/adapters) | 코드 | 로컬 Hugging Face LLM provider를 실행한다. | High | 메시지 생성 호출이 여기 있다. |
 | [`backend/src/db`](backend/src/db) | 코드 | SQLite/PostgreSQL store 구현과 snapshot 생성 로직이 있다. | High | 대화 상태의 원천이다. |
 | [`frontend`](frontend) | 코드 | React/Vite 채팅 UI, QR 가입/로그인, 관리자 대시보드를 담당한다. | High | 사용자 입력이 시작되는 곳이다. |
 | [`frontend/src/App.tsx`](frontend/src/App.tsx) | 코드 | 일반 경로에서는 채팅/QR 인증 화면을, `/achrai/`에서는 관리자 화면을 고르는 최상위 컴포넌트다. | High | 화면 진입 흐름만 본다. |
@@ -42,7 +42,7 @@
 | [`scheduler/src/index.ts`](scheduler/src/index.ts) | 코드 | `evaluateProactiveDecision`을 정의한다. | High | 침묵/쿨다운 판단 로직. |
 | [`database`](database) | 코드/설정 | SQLite migration, seed, DB 경로 해석 유틸이 있다. | High | 로컬 DB 초기화 담당. |
 | [`database/migrations/001_init.sql`](database/migrations/001_init.sql) | 데이터 | users, sessions, messages, proactive_events 등 테이블을 만든다. | High | DB 스키마 원본이다. |
-| [`local-llm`](local-llm) | 코드 | FastAPI 기반 로컬 LLM 서버를 제공한다. | Medium | `LLM_PROVIDER=hf-local`일 때 사용. |
+| [`local-llm`](local-llm) | 코드 | FastAPI 기반 로컬 LLM 서버를 제공한다. | Medium | 실행 시 필수로 사용한다. |
 | [`local-llm/server.py`](local-llm/server.py) | 코드 | `/health`, `/v1/generate`를 제공하고 GGUF 모델을 로드한다. | Medium | 명시적 로컬 모델 경로를 우선하고, 다운로드는 opt-in이다. |
 | [`prompt-engineering`](prompt-engineering) | 문서 | 시스템/침묵/안전/rapport/proactive 프롬프트 설계 문서. | Medium | 현재 코드에서 직접 import되는 것은 확인되지 않았다. |
 | [`screenshots`](screenshots) | 이미지 | README 또는 수동 검증용으로 보이는 앱 화면 이미지. | Low | 코드에서 참조는 확인되지 않았다. |
@@ -146,7 +146,7 @@ flowchart TD
 - timer, queue, socket runtime: [`backend/src/runtime/reactivePlanner.ts`](backend/src/runtime/reactivePlanner.ts), [`backend/src/runtime/proactiveLoop.ts`](backend/src/runtime/proactiveLoop.ts), [`backend/src/runtime/messageQueue.ts`](backend/src/runtime/messageQueue.ts), [`backend/src/runtime/realtime.ts`](backend/src/runtime/realtime.ts)
 - 반응 계획: [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts), [`backend/src/engine/messageGenerator.ts`](backend/src/engine/messageGenerator.ts)
 - 선제 발화 조건: [`scheduler/src/index.ts`](scheduler/src/index.ts)
-- provider 선택과 실행: [`backend/src/adapters/index.ts`](backend/src/adapters/index.ts), [`backend/src/adapters/mockProvider.ts`](backend/src/adapters/mockProvider.ts), [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts)
+- provider 실행: [`backend/src/adapters/index.ts`](backend/src/adapters/index.ts), [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts)
 - DB 저장과 snapshot: [`backend/src/db/store.ts`](backend/src/db/store.ts), [`backend/src/db/sqliteStore.ts`](backend/src/db/sqliteStore.ts), [`backend/src/db/postgresStore.ts`](backend/src/db/postgresStore.ts), [`database/migrations/001_init.sql`](database/migrations/001_init.sql)
 
 ## 6. 데이터 흐름
@@ -211,7 +211,7 @@ flowchart LR
 
 - 주기 설정: [`config.proactivePollMs`](backend/src/config.ts)
 - 조건 판단: [`evaluateProactiveDecision`](scheduler/src/index.ts)
-- 침묵 의미 추론: [`MessageGenerator.inferSilence`](backend/src/engine/messageGenerator.ts), [`detectUserSilenceMeaning`](backend/src/adapters/mockProvider.ts), [`detectUserSilenceMeaning`](backend/src/adapters/hfLocalProvider.ts)
+- 침묵 의미 추론: [`MessageGenerator.inferSilence`](backend/src/engine/messageGenerator.ts), [`detectUserSilenceMeaning`](backend/src/adapters/hfLocalProvider.ts)
 - 이벤트 기록: [`recordProactiveEvent`](backend/src/db/store.ts)
 
 ### 6.4 로컬 LLM 데이터 흐름
@@ -250,7 +250,6 @@ graph TD
     Backend --> Scheduler
     Backend --> Store[backend/src/db/store.ts]
     Backend --> ProviderIndex[backend/src/adapters/index.ts]
-    ProviderIndex --> Mock[backend/src/adapters/mockProvider.ts]
     ProviderIndex --> HF[backend/src/adapters/hfLocalProvider.ts]
     HF --> LocalLLM[local-llm/server.py]
     Store --> Migration[database/migrations/001_init.sql]
@@ -262,7 +261,7 @@ graph TD
 의존 관계를 코드 기준으로 풀면 다음과 같다.
 
 - [`backend/src/app.ts`](backend/src/app.ts)는 [`@turinglet/scheduler`](scheduler/src/index.ts), [`@turinglet/shared`](shared/src/index.ts), [`createProvider`](backend/src/adapters/index.ts), [`createStore`](backend/src/db/index.ts)를 모두 사용한다.
-- [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts)는 실패 시 [`MockProvider`](backend/src/adapters/mockProvider.ts)로 fallback한다.
+- [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts)는 로컬 LLM HTTP 서버를 호출하고, 실패하면 오류를 전파한다.
 - [`backend/src/db/store.ts`](backend/src/db/store.ts)는 [`@turinglet/database`](database/src/index.ts)의 [`resolveSqlitePath`](database/src/env.ts)를 사용하지만, 자체적으로도 repo root 탐색 로직을 갖고 있다.
 - [`frontend/src/App.tsx`](frontend/src/App.tsx)는 URL path와 [`frontend/src/store.ts`](frontend/src/store.ts)의 session 상태를 기준으로 일반 채팅 화면과 `/achrai/` 관리자 화면을 분기한다.
 - [`local-llm/server.py`](local-llm/server.py)는 TypeScript 패키지에 직접 import되지 않고 HTTP endpoint로만 연결된다.
@@ -286,10 +285,10 @@ graph TD
 ### 사용자 메시지 reactive 응답
 
 - 목적: 사용자의 메시지를 즉시 처리로 붙잡지 않고, 사용자가 말을 더 이어갈지 판단한 뒤 응답한다.
-- 관련 파일: [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx), [`backend/src/routes/chatRoutes.ts`](backend/src/routes/chatRoutes.ts), [`backend/src/runtime/reactivePlanner.ts`](backend/src/runtime/reactivePlanner.ts), [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts), [`backend/src/adapters/mockProvider.ts`](backend/src/adapters/mockProvider.ts), [`backend/src/db/store.ts`](backend/src/db/store.ts)
+- 관련 파일: [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx), [`backend/src/routes/chatRoutes.ts`](backend/src/routes/chatRoutes.ts), [`backend/src/runtime/reactivePlanner.ts`](backend/src/runtime/reactivePlanner.ts), [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts), [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts), [`backend/src/db/store.ts`](backend/src/db/store.ts)
 - 관련 리소스: [`database/migrations/001_init.sql`](database/migrations/001_init.sql)
-- 주요 클래스: [`ConversationOrchestrator`](backend/src/engine/orchestrator.ts), [`MockProvider`](backend/src/adapters/mockProvider.ts)
-- 주요 함수 또는 메서드: [`scheduleReactivePlan`](backend/src/runtime/reactivePlanner.ts), [`queuePlanMessages`](backend/src/runtime/messageQueue.ts), [`planForUserMessage`](backend/src/engine/orchestrator.ts), [`generateMultiMessagePlan`](backend/src/adapters/mockProvider.ts), [`appendMessage`](backend/src/db/store.ts)
+- 주요 클래스: [`ConversationOrchestrator`](backend/src/engine/orchestrator.ts), [`HuggingFaceLocalProvider`](backend/src/adapters/hfLocalProvider.ts)
+- 주요 함수 또는 메서드: [`scheduleReactivePlan`](backend/src/runtime/reactivePlanner.ts), [`queuePlanMessages`](backend/src/runtime/messageQueue.ts), [`planForUserMessage`](backend/src/engine/orchestrator.ts), [`generateMultiMessagePlan`](backend/src/adapters/hfLocalProvider.ts), [`appendMessage`](backend/src/db/store.ts)
 - 주요 변수 또는 상수: [`reactivePlanTimers`](backend/src/runtime/reactivePlanner.ts), [`reactiveSequence`](backend/src/runtime/reactivePlanner.ts), [`userContinuationGraceMs`](backend/src/config.ts), [`reactiveResponseMaxWaitMs`](backend/src/config.ts)
 - 입력: 사용자의 `content`, session header `x-session-id`, typing state
 - 처리: 사용자 메시지를 저장하고 socket으로 emit한다. 이후 delayed timer가 snapshot을 보고 `sendCount`가 0이면 기다리거나 강제 plan을 만든다.
@@ -325,16 +324,16 @@ graph TD
 - 예외 또는 주의점: [`recordProactiveEvent`](backend/src/db/store.ts)는 plan queue 직후 호출되므로, 이후 typing 때문에 메시지가 skip되어도 sent 이벤트가 남을 수 있다.
 - 내가 면접에서 설명해야 할 핵심: “선제 발화는 LLM이 마음대로 먼저 말하는 것이 아니라, 침묵 시간과 쿨다운, typing 상태를 통과한 경우에만 계획됩니다.”
 
-### 메시지 생성 provider와 fallback
+### 메시지 생성 provider
 
-- 목적: mock 기반 규칙 응답과 로컬 Hugging Face LLM 응답을 같은 interface로 사용한다.
-- 관련 파일: [`shared/src/index.ts`](shared/src/index.ts), [`backend/src/adapters/index.ts`](backend/src/adapters/index.ts), [`backend/src/adapters/mockProvider.ts`](backend/src/adapters/mockProvider.ts), [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts), [`local-llm/server.py`](local-llm/server.py)
+- 목적: backend가 로컬 Hugging Face LLM 서버를 `LLMProviderAdapter` interface 뒤에서 호출한다.
+- 관련 파일: [`shared/src/index.ts`](shared/src/index.ts), [`backend/src/adapters/index.ts`](backend/src/adapters/index.ts), [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts), [`local-llm/server.py`](local-llm/server.py)
 - 관련 리소스: [`local-llm/requirements.txt`](local-llm/requirements.txt), [`run-llm-server.ps1`](run-llm-server.ps1), [`run-llm-server.bat`](run-llm-server.bat)
-- 주요 클래스: [`MockProvider`](backend/src/adapters/mockProvider.ts), [`HuggingFaceLocalProvider`](backend/src/adapters/hfLocalProvider.ts), [`PlaceholderExternalProvider`](backend/src/adapters/index.ts)
-- 주요 함수 또는 메서드: [`createProvider`](backend/src/adapters/index.ts), [`generateMessage`](backend/src/adapters/mockProvider.ts), [`generateMultiMessagePlan`](backend/src/adapters/mockProvider.ts), [`summarizeConversationState`](backend/src/adapters/mockProvider.ts), [`detectUserSilenceMeaning`](backend/src/adapters/mockProvider.ts), [`invoke`](backend/src/adapters/hfLocalProvider.ts)
+- 주요 클래스: [`HuggingFaceLocalProvider`](backend/src/adapters/hfLocalProvider.ts)
+- 주요 함수 또는 메서드: [`createProvider`](backend/src/adapters/index.ts), [`generateMessage`](backend/src/adapters/hfLocalProvider.ts), [`generateMultiMessagePlan`](backend/src/adapters/hfLocalProvider.ts), [`summarizeConversationState`](backend/src/adapters/hfLocalProvider.ts), [`detectUserSilenceMeaning`](backend/src/adapters/hfLocalProvider.ts), [`invoke`](backend/src/adapters/hfLocalProvider.ts)
 - 주요 변수 또는 상수: [`LLMProviderAdapter`](shared/src/index.ts), [`HF_LOCAL_URL`](.env.example), [`HF_LOCAL_TIMEOUT_MS`](.env.example), [`MODEL_REPO`](local-llm/server.py), [`MODEL_FILE`](local-llm/server.py)
 - 입력: snapshot, userText, recentMessages, silenceMeaning
-- 처리: `LLM_PROVIDER=mock`이면 mock provider를 쓰고, `hf-local`이면 HTTP로 로컬 LLM 서버를 호출한다. 실패하면 mock으로 fallback한다.
+- 처리: backend 시작 전 [`waitForLocalLlm`](backend/src/runtime/llmHealth.ts)이 LLM health를 기다린다. 이후 provider는 HTTP로 로컬 LLM 서버를 호출하며, 실패하면 오류를 전파한다.
 - 출력: `MultiMessagePlan`, 단일 메시지, emotional summary, silence meaning
 - 예외 또는 주의점: HF provider의 `nextState`는 문자열 존재만 확인하고 구체 enum 검증은 하지 않는다.
 - 내가 면접에서 설명해야 할 핵심: “LLM 생성 자체는 adapter 뒤에 숨겨두고, 정책 엔진은 provider가 어떤 구현인지 몰라도 같은 `MultiMessagePlan`을 받습니다.”
@@ -342,10 +341,10 @@ graph TD
 ### 감정 상태 요약과 snapshot
 
 - 목적: 최근 대화의 감정 강도를 저장하고, reactive/proactive 정책에 사용한다.
-- 관련 파일: [`backend/src/app.ts`](backend/src/app.ts), [`backend/src/db/store.ts`](backend/src/db/store.ts), [`backend/src/adapters/mockProvider.ts`](backend/src/adapters/mockProvider.ts), [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts)
+- 관련 파일: [`backend/src/app.ts`](backend/src/app.ts), [`backend/src/db/store.ts`](backend/src/db/store.ts), [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts)
 - 관련 리소스: [`database/migrations/001_init.sql`](database/migrations/001_init.sql)
 - 주요 클래스: [`SqliteStore`](backend/src/db/store.ts), [`PostgresStore`](backend/src/db/store.ts)
-- 주요 함수 또는 메서드: [`summarizeConversationState`](backend/src/adapters/mockProvider.ts), [`upsertEmotionalSnapshot`](backend/src/db/store.ts), [`getConversationSnapshot`](backend/src/db/store.ts), [`mapState`](backend/src/db/store.ts)
+- 주요 함수 또는 메서드: [`summarizeConversationState`](backend/src/adapters/hfLocalProvider.ts), [`upsertEmotionalSnapshot`](backend/src/db/store.ts), [`getConversationSnapshot`](backend/src/db/store.ts), [`mapState`](backend/src/db/store.ts)
 - 주요 변수 또는 상수: [`recentEmotionalIntensity`](shared/src/index.ts), `intensity >= 7`
 - 입력: 최근 메시지 30개, sessionId
 - 처리: 사용자 메시지 후 background task가 provider summary를 만들고 `emotional_state_snapshots`에 새 row를 insert한다.
@@ -377,15 +376,14 @@ graph TD
 | [`queuePlanMessages`](backend/src/runtime/messageQueue.ts) | 함수 | [`backend/src/runtime/messageQueue.ts`](backend/src/runtime/messageQueue.ts) | `MultiMessagePlan.messages`를 delay에 맞춰 저장/emit한다. | [`appendMessage`](backend/src/db/store.ts) |
 | [`runProactiveLoop`](backend/src/runtime/proactiveLoop.ts) | 함수 | [`backend/src/runtime/proactiveLoop.ts`](backend/src/runtime/proactiveLoop.ts) | 활성 세션을 순회하며 선제 발화를 판단한다. | [`evaluateProactiveDecision`](scheduler/src/index.ts) |
 | [`requireSession`](backend/src/routes/sessionAuth.ts) | 함수 | [`backend/src/routes/sessionAuth.ts`](backend/src/routes/sessionAuth.ts) | `x-session-id` header를 검증하고 session을 touch한다. | [`getSessionById`](backend/src/db/store.ts) |
-| [`ConversationOrchestrator`](backend/src/engine/orchestrator.ts) | 클래스 | [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts) | 사용자 메시지/침묵에 대한 응답 계획을 만든다. | [`MockProvider`](backend/src/adapters/mockProvider.ts) |
-| [`likelyUserWillContinue`](backend/src/engine/orchestrator.ts) | 함수 | [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts) | 짧은 조각, 연결어, 열린 어미 등으로 이어 말할 가능성을 판단한다. | [`looksLikeContinuation`](backend/src/adapters/mockProvider.ts) |
+| [`ConversationOrchestrator`](backend/src/engine/orchestrator.ts) | 클래스 | [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts) | 사용자 메시지/침묵에 대한 응답 계획을 만든다. | [`LLMProviderAdapter`](shared/src/index.ts) |
+| [`likelyUserWillContinue`](backend/src/engine/orchestrator.ts) | 함수 | [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts) | 짧은 조각, 연결어, 열린 어미 등으로 이어 말할 가능성을 판단한다. | 자체 정규식 |
 | [`planForUserMessage`](backend/src/engine/orchestrator.ts) | 메서드 | [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts) | typing/continuation이면 `sendCount: 0`, 아니면 provider plan을 반환한다. | [`scheduleReactivePlan`](backend/src/runtime/reactivePlanner.ts) |
 | [`planForSilence`](backend/src/engine/orchestrator.ts) | 메서드 | [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts) | 감정 강도에 따라 empathy 또는 check-in 메시지를 만든다. | [`runProactiveLoop`](backend/src/runtime/proactiveLoop.ts) |
 | [`MessageGenerator`](backend/src/engine/messageGenerator.ts) | 클래스 | [`backend/src/engine/messageGenerator.ts`](backend/src/engine/messageGenerator.ts) | provider의 단일 메시지 생성과 침묵 의미 추론을 감싼다. | [`HuggingFaceLocalProvider`](backend/src/adapters/hfLocalProvider.ts) |
 | [`evaluateProactiveDecision`](scheduler/src/index.ts) | 함수 | [`scheduler/src/index.ts`](scheduler/src/index.ts) | typing, lastUserMessageAt, silence, cooldown으로 선제 발화 여부를 판단한다. | [`ProactiveDecisionInput`](shared/src/index.ts) |
-| [`MockProvider`](backend/src/adapters/mockProvider.ts) | 클래스 | [`backend/src/adapters/mockProvider.ts`](backend/src/adapters/mockProvider.ts) | 규칙 기반 메시지 plan, 감정 강도, 침묵 의미를 만든다. | [`LLMProviderAdapter`](shared/src/index.ts) |
-| [`HuggingFaceLocalProvider`](backend/src/adapters/hfLocalProvider.ts) | 클래스 | [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts) | 로컬 LLM HTTP 서버를 호출하고 실패 시 mock fallback을 사용한다. | [`local-llm/server.py`](local-llm/server.py) |
-| [`createProvider`](backend/src/adapters/index.ts) | 함수 | [`backend/src/adapters/index.ts`](backend/src/adapters/index.ts) | `config.llmProvider`에 따라 provider 구현을 선택한다. | [`config`](backend/src/config.ts) |
+| [`HuggingFaceLocalProvider`](backend/src/adapters/hfLocalProvider.ts) | 클래스 | [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts) | 로컬 LLM HTTP 서버를 호출하고 실패 시 오류를 전파한다. | [`local-llm/server.py`](local-llm/server.py) |
+| [`createProvider`](backend/src/adapters/index.ts) | 함수 | [`backend/src/adapters/index.ts`](backend/src/adapters/index.ts) | Hugging Face local provider를 생성한다. | [`HuggingFaceLocalProvider`](backend/src/adapters/hfLocalProvider.ts) |
 | [`SqliteStore`](backend/src/db/sqliteStore.ts) | 클래스 | [`backend/src/db/sqliteStore.ts`](backend/src/db/sqliteStore.ts) | SQLite 기반 `Store` 구현이다. | [`database/migrations/001_init.sql`](database/migrations/001_init.sql) |
 | [`PostgresStore`](backend/src/db/postgresStore.ts) | 클래스 | [`backend/src/db/postgresStore.ts`](backend/src/db/postgresStore.ts) | PostgreSQL 기반 `Store` 구현이다. | [`createStore`](backend/src/db/index.ts) |
 | [`Store`](backend/src/db/types.ts) | interface | [`backend/src/db/types.ts`](backend/src/db/types.ts) | 사용자/세션/메시지/typing/proactive/snapshot 메서드 계약이다. | [`SqliteStore`](backend/src/db/sqliteStore.ts) |
@@ -395,7 +393,7 @@ graph TD
 | [`encodeQrPayload`](backend/src/utils/qrPayload.ts) | 함수 | [`backend/src/utils/qrPayload.ts`](backend/src/utils/qrPayload.ts) | QR payload를 `TLQR1:` prefix + base64url JSON으로 만든다. | [`decodeQrPayload`](backend/src/utils/qrPayload.ts) |
 | [`decodeQrPayload`](backend/src/utils/qrPayload.ts) | 함수 | [`backend/src/utils/qrPayload.ts`](backend/src/utils/qrPayload.ts) | QR payload를 파싱하고 Zod schema로 검증한다. | [`LoginSchema`](backend/src/routes/schemas.ts) |
 | [`createRateLimiter`](backend/src/rateLimit.ts) | 함수 | [`backend/src/rateLimit.ts`](backend/src/rateLimit.ts) | IP 기반 in-memory rate limit middleware를 만든다. | [`config.rateLimitMax`](backend/src/config.ts) |
-| [`config`](backend/src/config.ts) | 상수 | [`backend/src/config.ts`](backend/src/config.ts) | 환경 변수와 fallback을 모은 runtime 설정이다. | [`.env.example`](.env.example) |
+| [`config`](backend/src/config.ts) | 상수 | [`backend/src/config.ts`](backend/src/config.ts) | 환경 변수와 runtime 설정을 모은다. | [`.env.example`](.env.example) |
 | [`resolveSqlitePath`](database/src/env.ts) | 함수 | [`database/src/env.ts`](database/src/env.ts) | repo root 기준 SQLite 경로를 계산한다. | [`database/src/migrate.ts`](database/src/migrate.ts) |
 | [`migrate.ts`](database/src/migrate.ts) | 스크립트 | [`database/src/migrate.ts`](database/src/migrate.ts) | SQL migration 파일을 SQLite DB에 적용한다. | [`database/migrations/001_init.sql`](database/migrations/001_init.sql) |
 | [`App`](frontend/src/App.tsx) | component | [`frontend/src/App.tsx`](frontend/src/App.tsx) | `/achrai/` 경로에서는 관리자 화면을, 그 외에는 세션 여부에 따라 채팅 또는 QR 인증 화면을 고른다. | [`useAppStore`](frontend/src/store.ts) |
@@ -431,26 +429,15 @@ graph TD
 - 시간 또는 성능상 주의할 점: [`startScheduler`](backend/src/runtime/proactiveLoop.ts)는 [`config.proactivePollMs`](backend/src/config.ts)마다 모든 active session을 순회한다. 세션 수가 많아지면 DB query 수가 증가한다.
 - 개선 가능성: proactive event와 실제 message send 성공 여부를 연결해 sent/skip 상태를 더 정확히 기록할 수 있다.
 
-### MockProvider 메시지 plan 생성
+### HF local provider 호출 로직
 
-- 무엇을 하는가: greeting, continuation, 감정 테마, 감정 강도, 질문 여부, 긴 텍스트 여부에 따라 여러 개의 짧은 메시지 plan을 만든다.
-- 왜 필요한가: 외부 LLM 없이도 대화 타이밍과 multi-message UI를 검증하기 위해서다.
-- 관련 파일: [`backend/src/adapters/mockProvider.ts`](backend/src/adapters/mockProvider.ts)
-- 관련 함수 또는 클래스: [`MockProvider.generateMultiMessagePlan`](backend/src/adapters/mockProvider.ts), [`detectTheme`](backend/src/adapters/mockProvider.ts), [`pickIntensityFromText`](backend/src/adapters/mockProvider.ts), [`buildBurst`](backend/src/adapters/mockProvider.ts)
-- 어떤 입력을 받는가: `snapshot`, `userText`, 선택적 `silenceMeaning`
-- 어떤 출력을 만드는가: `sendCount`, `reason`, `nextState`, `messages[]`
-- 시간 또는 성능상 주의할 점: 규칙 기반이라 빠르지만 실제 언어 다양성에는 취약하다.
-- 개선 가능성: 테마/강도 판단을 테스트 fixture로 늘리고, high emotional load 메시지 개수를 사용자 경험 기준으로 조정할 수 있다.
-
-### HF local provider fallback 로직
-
-- 무엇을 하는가: backend가 [`local-llm/server.py`](local-llm/server.py)의 `/v1/generate`를 호출하고, 실패하거나 응답 구조가 맞지 않으면 [`MockProvider`](backend/src/adapters/mockProvider.ts)를 사용한다.
-- 왜 필요한가: 로컬 모델이 느리거나 실패해도 앱 흐름을 끊지 않기 위해서다.
-- 관련 파일: [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts), [`backend/src/adapters/mockProvider.ts`](backend/src/adapters/mockProvider.ts), [`local-llm/server.py`](local-llm/server.py)
-- 관련 함수 또는 클래스: [`HuggingFaceLocalProvider.invoke`](backend/src/adapters/hfLocalProvider.ts), [`aiSinglePlanFallback`](backend/src/adapters/hfLocalProvider.ts), [`generateMultiMessagePlan`](backend/src/adapters/hfLocalProvider.ts)
+- 무엇을 하는가: backend가 [`local-llm/server.py`](local-llm/server.py)의 `/v1/generate`를 호출하고, 실패하거나 응답 구조가 맞지 않으면 오류를 전파한다.
+- 왜 필요한가: 모델을 사용할 수 없는 상태를 숨기지 않고 실행 실패나 요청 실패로 드러내기 위해서다.
+- 관련 파일: [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts), [`local-llm/server.py`](local-llm/server.py)
+- 관련 함수 또는 클래스: [`HuggingFaceLocalProvider.invoke`](backend/src/adapters/hfLocalProvider.ts), [`generateMultiMessagePlan`](backend/src/adapters/hfLocalProvider.ts)
 - 어떤 입력을 받는가: task와 payload
 - 어떤 출력을 만드는가: 검증된 `MultiMessagePlan`, summary, silence meaning
-- 시간 또는 성능상 주의할 점: [`hfLocalTimeoutMs`](backend/src/config.ts) timeout이 걸리면 fallback한다. 로컬 LLM은 첫 로딩과 모델 다운로드가 무겁다.
+- 시간 또는 성능상 주의할 점: [`hfLocalTimeoutMs`](backend/src/config.ts) timeout이 걸리면 요청이 실패한다. 로컬 LLM은 첫 로딩과 모델 다운로드가 무겁다.
 - 개선 가능성: `nextState` enum 검증과 task별 structured output 검증을 더 엄격히 할 수 있다.
 
 ### QR payload encoding 로직
@@ -490,19 +477,17 @@ graph TD
 | `PROACTIVE_COOLDOWN_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | 선제 발화 쿨다운 | `240000` | 낮추면 반복 check-in이 잦아진다. |
 | `USER_CONTINUATION_GRACE_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | 사용자 메시지 후 첫 reactive 판단 대기 시간 | `600` | 짧으면 응답이 빨라지고, 길면 이어 말하기를 더 기다린다. |
 | `REACTIVE_RESPONSE_MAX_WAIT_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | continuation으로 응답을 미룰 수 있는 최대 시간 | `20000` | 길면 응답 지연이 늘 수 있다. |
-| `MOCK_PROVIDER` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | mock provider 사용 여부에 영향 | `true` unless `false` | `false`면 providerMode fallback이 `hf-local`로 간다. |
-| `LLM_PROVIDER` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | `mock` 또는 `hf-local` provider 선택 | `mock` | 로컬 LLM 사용 여부가 바뀐다. |
 | `HF_LOCAL_URL` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | local LLM endpoint origin | `http://127.0.0.1:8010` | HF provider 호출 대상이 바뀐다. |
-| `HF_LOCAL_TIMEOUT_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | HF provider timeout | `30000` | 길면 느린 모델을 더 기다리고, 짧으면 fallback이 빨라진다. |
+| `HF_LOCAL_TIMEOUT_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts) | HF provider request timeout | `30000` | 길면 느린 모델 응답을 더 기다리고, 짧으면 요청 실패가 빨라진다. |
+| `HF_LOCAL_STARTUP_WAIT_MS` | [`.env.example`](.env.example), [`backend/src/config.ts`](backend/src/config.ts), [`backend/src/runtime/llmHealth.ts`](backend/src/runtime/llmHealth.ts) | backend 시작 전 LLM health 대기 시간 | `120000` | LLM 로딩이 이 시간을 넘으면 backend가 시작하지 않는다. |
 | `VITE_BACKEND_ORIGIN` | [`frontend/src/api.ts`](frontend/src/api.ts), [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx) | 프론트에서 backend origin override | 미설정 시 현재 host의 `:4000` | LAN/배포 환경에서 API 주소를 바꾼다. |
 | `HF_MODEL_PATH` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | 로컬 GGUF 모델 파일 경로 | 빈 값 | 설정하면 자동 다운로드 없이 해당 파일을 로드한다. |
-| `HF_ALLOW_MODEL_DOWNLOAD` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face 모델 다운로드 허용 여부 | `true` | `true`일 때 실행 중 필요한 GGUF를 받는다. |
+| `HF_ALLOW_MODEL_DOWNLOAD` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face 모델 다운로드 허용 여부 | `false` | `true`일 때만 로컬 파일 실패 후 필요한 GGUF를 받는다. |
 | `HF_MODEL_CACHE_DIR` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | 다운로드 모델 cache 위치 | `./local-llm/models` | repo 내부 경로를 기본값으로 사용한다. |
 | `HF_MODEL_REPO` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face model repo | `Qwen/Qwen2.5-0.5B-Instruct-GGUF` | 다운로드 opt-in 시 받을 GGUF repo가 바뀐다. |
 | `HF_MODEL_FILE` | [`.env.example`](.env.example), [`local-llm/server.py`](local-llm/server.py) | Hugging Face model file | `qwen2.5-0.5b-instruct-q4_k_m.gguf` | 모델 크기/성능/메모리 요구량이 바뀐다. |
 | `HF_LOCAL_HOST` | [`local-llm/server.py`](local-llm/server.py) | local LLM bind host | `127.0.0.1` | 외부 기기 접근 가능성이 바뀐다. |
 | `HF_LOCAL_PORT` | [`local-llm/server.py`](local-llm/server.py) | local LLM port | `8010` | backend `HF_LOCAL_URL`도 맞춰야 한다. |
-| `BURST_PRESENCE_SEQUENCE` | [`backend/src/adapters/mockProvider.ts`](backend/src/adapters/mockProvider.ts) | multi-message 전송 전 presence 순서 | `typing`, `thinking`, `organizing` | assistant 상태 표시 리듬이 바뀐다. |
 | typing debounce | [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx) | 입력 멈춤 후 typing false 전송 시간 | `4000ms` | 너무 짧으면 사용자가 아직 입력 중인데 false가 될 수 있다. |
 | typing freshness | [`backend/src/db/sqlitePresenceEvents.ts`](backend/src/db/sqlitePresenceEvents.ts), [`backend/src/db/postgresPresenceEvents.ts`](backend/src/db/postgresPresenceEvents.ts) | typing true를 유효하게 보는 시간 | `6000ms` | 너무 길면 assistant 응답이 과하게 지연된다. |
 | Electron retry count | [`frontend/electron/main.ts`](frontend/electron/main.ts), [`frontend/electron/main.mjs`](frontend/electron/main.mjs) | Vite URL load retry 횟수 | `30` | 프론트 서버가 늦게 켜질 때 대기 시간이 바뀐다. |
@@ -518,11 +503,11 @@ graph TD
 - Node.js와 npm: 정확한 최소 버전은 코드에서 확인 필요.
 - Python venv: [`local-llm/requirements.txt`](local-llm/requirements.txt)에 필요한 Python 패키지가 정의되어 있다. 정확한 최소 Python 버전은 확인 필요.
 - SQLite: [`better-sqlite3`](backend/package.json)을 사용한다.
-- 로컬 LLM을 쓰려면 로컬 GGUF 모델 경로(`HF_MODEL_PATH`)가 필요하다. 클라우드 한 줄 실행은 GGUF/safetensors를 다운로드하지 않고, 사용자가 직접 넣은 GGUF 파일 경로를 검사한다.
+- 로컬 LLM은 필수다. 기본 실행은 로컬 GGUF 모델 경로(`HF_MODEL_PATH`)를 검사하고, `HF_ALLOW_MODEL_DOWNLOAD=true`를 명시한 경우에만 Hugging Face 다운로드 경로를 허용한다.
 
 ### 설치 명령
 
-Windows PowerShell과 Debian Bash는 Python 가상환경 경로와 활성화 명령이 다르다. 설치와 `.env` 준비는 별도로 수행하고, 실행 표면은 루트 [`package.json`](package.json)의 npm scripts로 통일한다. mock 개발은 `npm run dev:mock`, Windows GGUF 개발은 `npm run dev:llm:windows`, Debian GGUF 개발은 `npm run dev:llm:debian`을 사용한다.
+Windows PowerShell과 Debian Bash는 Python 가상환경 경로와 활성화 명령이 다르다. 설치와 `.env` 준비는 별도로 수행하고, 실행 표면은 루트 [`package.json`](package.json)의 npm scripts로 통일한다. Windows GGUF 개발은 `npm run dev:llm:windows`, Debian GGUF 개발은 `npm run dev:llm:debian`을 사용한다.
 
 ```powershell
 npm install
@@ -543,7 +528,7 @@ pip install -r local-llm/requirements.txt
 Copy-Item .env.example .env -Force
 ```
 
-mock provider만 쓰려면 [`.env.example`](.env.example)의 `LLM_PROVIDER=mock`, `MOCK_PROVIDER=true` 흐름을 사용한다. 로컬 LLM을 쓰려면 `LLM_PROVIDER=hf-local`, `HF_LOCAL_URL=http://127.0.0.1:8010`, 그리고 `HF_MODEL_PATH` 또는 `HF_ALLOW_MODEL_DOWNLOAD=true`가 필요하다.
+로컬 LLM은 필수다. `HF_LOCAL_URL=http://127.0.0.1:8010`을 기준으로 backend가 health check를 기다리며, `HF_MODEL_PATH`에 유효한 GGUF를 지정하거나 `HF_ALLOW_MODEL_DOWNLOAD=true`와 올바른 `HF_MODEL_REPO`/`HF_MODEL_FILE`을 지정해야 한다.
 
 ### DB migration
 
@@ -556,18 +541,16 @@ npm run migrate
 ### 개발 실행
 
 ```powershell
-npm run dev:mock
 npm run dev:llm:windows
 ```
 
 ```bash
-npm run dev:mock
 npm run dev:llm:debian
 ```
 
 루트 [`package.json`](package.json)의 `predev`가 먼저 [`shared`](shared), [`scheduler`](scheduler), [`database`](database)를 build하고 migration을 실행한 뒤, [`backend`](backend)와 [`frontend`](frontend)를 동시에 실행한다. `dev:llm:*` 명령은 LLM 서버와 `npm run dev`를 `concurrently --kill-others`로 함께 실행한다.
 
-Debian/Ubuntu 클라우드에서는 모델 파일을 `local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf`에 직접 넣은 뒤 `sudo bash deploy/cloud-run.sh`를 실행한다. README에는 `huggingface-cli`, `curl`, `wget`으로 기본 GGUF를 받는 명령을 기록했다. 다른 경로를 쓰면 `sudo env HF_MODEL_PATH=/absolute/path/to/model.gguf bash deploy/cloud-run.sh`로 지정한다. 스크립트는 production build 후 `saammaago-llm`, `saammaago-app` systemd 서비스를 등록한다. 앱은 `NODE_ENV=production`, `PORT=80`, `node backend/dist/src/server.js`로 실행되어 `http://서버_IP`에서 프론트와 API를 함께 제공한다. 종료는 `sudo systemctl stop saammaago-app saammaago-llm`을 사용한다.
+Debian/Ubuntu 클라우드에서는 모델 파일을 `local-llm/models/qwen2.5-0.5b-instruct-q4_k_m.gguf`에 직접 넣은 뒤 `sudo bash deploy/cloud-run.sh`를 실행하는 방식을 기본으로 한다. README에는 `huggingface-cli`, `curl`, `wget`으로 기본 GGUF를 받는 명령을 기록했다. 다른 경로를 쓰면 `sudo env HF_MODEL_PATH=/absolute/path/to/model.gguf bash deploy/cloud-run.sh`로 지정한다. `HF_ALLOW_MODEL_DOWNLOAD=true`를 명시한 경우에는 LLM 서버가 Hugging Face 다운로드를 시도할 수 있다. 스크립트는 production build 후 `saammaago-llm`, `saammaago-app` systemd 서비스를 등록한다. 앱은 `NODE_ENV=production`, `PORT=80`, `node backend/dist/src/server.js`로 실행되어 `http://서버_IP`에서 프론트와 API를 함께 제공한다. 종료는 `sudo systemctl stop saammaago-app saammaago-llm`을 사용한다.
 
 기본 주소:
 
@@ -653,11 +636,11 @@ npm test
 
 ### 기술 질문 대응용 설명
 
-구조는 npm workspace 모노레포입니다. [`shared/src/index.ts`](shared/src/index.ts)에 메시지, snapshot, provider interface 타입을 두고, [`backend`](backend)은 [`backend/src/app.ts`](backend/src/app.ts)에서 route/runtime/store/provider를 조립합니다. DB는 [`Store`](backend/src/db/types.ts) interface 뒤에 [`SqliteStore`](backend/src/db/sqliteStore.ts)와 [`PostgresStore`](backend/src/db/postgresStore.ts) 구현을 둔 형태입니다. 사용자의 입력은 [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx)에서 REST API로 보내고, 서버의 assistant 메시지와 presence는 Socket.IO room `session:{sessionId}`로 받습니다. reactive 흐름에서는 [`ConversationOrchestrator.planForUserMessage`](backend/src/engine/orchestrator.ts)가 typing 또는 continuation이면 `sendCount: 0`으로 응답을 미루고, proactive 흐름에서는 [`evaluateProactiveDecision`](scheduler/src/index.ts)가 침묵 시간과 쿨다운을 판단합니다. LLM provider는 [`LLMProviderAdapter`](shared/src/index.ts)로 추상화되어 mock과 로컬 HF 서버를 바꿔 쓸 수 있습니다.
+구조는 npm workspace 모노레포입니다. [`shared/src/index.ts`](shared/src/index.ts)에 메시지, snapshot, provider interface 타입을 두고, [`backend`](backend)은 [`backend/src/app.ts`](backend/src/app.ts)에서 route/runtime/store/provider를 조립합니다. DB는 [`Store`](backend/src/db/types.ts) interface 뒤에 [`SqliteStore`](backend/src/db/sqliteStore.ts)와 [`PostgresStore`](backend/src/db/postgresStore.ts) 구현을 둔 형태입니다. 사용자의 입력은 [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx)에서 REST API로 보내고, 서버의 assistant 메시지와 presence는 Socket.IO room `session:{sessionId}`로 받습니다. reactive 흐름에서는 [`ConversationOrchestrator.planForUserMessage`](backend/src/engine/orchestrator.ts)가 typing 또는 continuation이면 `sendCount: 0`으로 응답을 미루고, proactive 흐름에서는 [`evaluateProactiveDecision`](scheduler/src/index.ts)가 침묵 시간과 쿨다운을 판단합니다. LLM provider는 [`LLMProviderAdapter`](shared/src/index.ts)를 구현한 [`HuggingFaceLocalProvider`](backend/src/adapters/hfLocalProvider.ts) 단일 경로를 사용합니다.
 
 ### AI 코딩 도구 사용 질문 대응
 
-GitHub Copilot과 Codex를 활용해 구현 속도를 높였고, 구조 이해, 테스트, 디버깅, 결과 검증을 직접 수행했습니다. 특히 코드를 그대로 생성해 끝낸 것이 아니라, backend의 메시지 지연 흐름, scheduler의 선제 발화 조건, provider fallback, QR 인증과 DB 저장 구조를 직접 읽고 연결 관계를 확인했습니다. 리팩터링 후에는 `npm test`와 `npm run build`를 직접 실행해 서비스가 깨지지 않는지 확인했습니다.
+GitHub Copilot과 Codex를 활용해 구현 속도를 높였고, 구조 이해, 테스트, 디버깅, 결과 검증을 직접 수행했습니다. 특히 코드를 그대로 생성해 끝낸 것이 아니라, backend의 메시지 지연 흐름, scheduler의 선제 발화 조건, LLM provider 호출, QR 인증과 DB 저장 구조를 직접 읽고 연결 관계를 확인했습니다. 리팩터링 후에는 `npm test`와 `npm run build`를 직접 실행해 서비스가 깨지지 않는지 확인했습니다.
 
 ## 15. 내가 반드시 이해해야 할 코드
 
@@ -666,11 +649,11 @@ GitHub Copilot과 Codex를 활용해 구현 속도를 높였고, 구조 이해, 
 | 1 | [`backend/src/app.ts`](backend/src/app.ts) | 서버 의존성을 조립하는 composition root다. | route/runtime/store/provider가 어떻게 연결되는지 확인 |
 | 2 | [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts) | “언제 응답을 미룰지”를 결정하는 정책 파일이다. | `likelyUserWillContinue`, `planForUserMessage`, `planForSilence` |
 | 3 | [`scheduler/src/index.ts`](scheduler/src/index.ts) | 선제 발화 eligibility를 독립적으로 판단한다. | typing, silence, cooldown 조건 |
-| 4 | [`backend/src/adapters/mockProvider.ts`](backend/src/adapters/mockProvider.ts) | 실제 메시지 plan 생성 규칙이 가장 많이 들어 있다. | `detectTheme`, `pickIntensityFromText`, `buildBurst`, high emotional load 분기 |
+| 4 | [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts) | backend가 로컬 LLM 서버 결과를 어떻게 검증하는지 보여준다. | `invoke`, response validation, error propagation |
 | 5 | [`backend/src/db/sqliteStore.ts`](backend/src/db/sqliteStore.ts) | SQLite store가 작게 나뉜 query helper를 어떻게 묶는지 보여준다. | auth/session/message/presence/admin helper 연결 |
 | 6 | [`frontend/src/components/ChatPanel.tsx`](frontend/src/components/ChatPanel.tsx) | 사용자 입력, socket 수신, typing timer가 들어 있다. | `sendTyping`, `onDraftChange`, socket handlers |
 | 7 | [`shared/src/index.ts`](shared/src/index.ts) | 모든 모듈이 공유하는 타입 계약이다. | `ConversationSnapshot`, `MultiMessagePlan`, `LLMProviderAdapter` |
-| 8 | [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts) | 로컬 LLM 연결과 fallback 흐름을 이해해야 한다. | `invoke`, response validation, fallback 순서 |
+| 8 | [`local-llm/server.py`](local-llm/server.py) | 로컬 모델 로드와 task별 생성 형식을 담당한다. | 모델 검증, `/health`, `/v1/generate` |
 | 9 | [`local-llm/server.py`](local-llm/server.py) | 로컬 모델 로드와 task별 생성 형식을 담당한다. | `/v1/generate`, `_extract_json`, task별 prompt |
 | 10 | [`database/migrations/001_init.sql`](database/migrations/001_init.sql) | 데이터 모델을 한 번에 볼 수 있다. | users, sessions, messages, proactive_events, emotional_state_snapshots |
 
@@ -696,13 +679,13 @@ GitHub Copilot과 Codex를 활용해 구현 속도를 높였고, 구조 이해, 
 | Medium | HF response의 `nextState` enum 검증 강화 | 잘못된 LLM output으로 인한 상태 오염을 줄인다. | [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts), [`shared/src/index.ts`](shared/src/index.ts) |
 | Medium | PostgreSQL migration 경로 추가 | `DB_PROVIDER=postgres`를 실제 운영 후보로 만들 수 있다. | [`database/src/migrate.ts`](database/src/migrate.ts), [`backend/src/db/store.ts`](backend/src/db/store.ts) |
 | Hard | reactive/proactive 정책 평가 지표 추가 | “자연스러운 타이밍”을 정량적으로 비교할 수 있다. | [`backend/src/app.ts`](backend/src/app.ts), [`scheduler/src/index.ts`](scheduler/src/index.ts), [`backend/tests/policy.test.ts`](backend/tests/policy.test.ts) |
-| Hard | 실제 safety-sensitive 감지와 대응 플로우 구현 | 상담형 대화의 안전성을 높인다. | [`database/migrations/001_init.sql`](database/migrations/001_init.sql), [`prompt-engineering/safety-sensitive-response-prompt.md`](prompt-engineering/safety-sensitive-response-prompt.md), [`backend/src/adapters/mockProvider.ts`](backend/src/adapters/mockProvider.ts) |
+| Hard | 실제 safety-sensitive 감지와 대응 플로우 구현 | 상담형 대화의 안전성을 높인다. | [`database/migrations/001_init.sql`](database/migrations/001_init.sql), [`prompt-engineering/safety-sensitive-response-prompt.md`](prompt-engineering/safety-sensitive-response-prompt.md), [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts) |
 | Hard | 사용자별 대화 속도와 interruption tolerance 학습 | 개인화된 응답 타이밍을 만들 수 있다. | [`backend/src/db/store.ts`](backend/src/db/store.ts), [`scheduler/src/index.ts`](scheduler/src/index.ts) |
 
 ## 작업 완료 요약
 
 1. 새로 만든 문서의 주요 섹션: 프로젝트 요약, 문제 정의, 저장소 구조, 리소스 인벤토리, 전체 실행 흐름, 데이터 흐름, 모듈 의존 관계, 핵심 기능별 구조, 식별자 사전, 핵심 알고리즘, 설정값, 실행 방법, 테스트/검증, 면접 스크립트, 필수 코드, 약점, 개선 과제.
-2. 확인한 주요 코드 파일: [`backend/src/app.ts`](backend/src/app.ts), [`backend/src/server.ts`](backend/src/server.ts), [`backend/src/config.ts`](backend/src/config.ts), [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts), [`backend/src/engine/messageGenerator.ts`](backend/src/engine/messageGenerator.ts), [`backend/src/adapters/mockProvider.ts`](backend/src/adapters/mockProvider.ts), [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts), [`backend/src/db/store.ts`](backend/src/db/store.ts), [`scheduler/src/index.ts`](scheduler/src/index.ts), [`shared/src/index.ts`](shared/src/index.ts), [`frontend/src/App.tsx`](frontend/src/App.tsx), [`local-llm/server.py`](local-llm/server.py).
+2. 확인한 주요 코드 파일: [`backend/src/app.ts`](backend/src/app.ts), [`backend/src/server.ts`](backend/src/server.ts), [`backend/src/config.ts`](backend/src/config.ts), [`backend/src/runtime/llmHealth.ts`](backend/src/runtime/llmHealth.ts), [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts), [`backend/src/engine/messageGenerator.ts`](backend/src/engine/messageGenerator.ts), [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts), [`backend/src/db/store.ts`](backend/src/db/store.ts), [`scheduler/src/index.ts`](scheduler/src/index.ts), [`shared/src/index.ts`](shared/src/index.ts), [`frontend/src/App.tsx`](frontend/src/App.tsx), [`local-llm/server.py`](local-llm/server.py).
 3. 확인한 주요 리소스 파일: [`.env.example`](.env.example), [`database/migrations/001_init.sql`](database/migrations/001_init.sql), [`local-llm/requirements.txt`](local-llm/requirements.txt), [`prompt-engineering/system-prompt.md`](prompt-engineering/system-prompt.md), [`prompt-engineering/silence-interpretation-prompt.md`](prompt-engineering/silence-interpretation-prompt.md), [`prompt-engineering/safety-sensitive-response-prompt.md`](prompt-engineering/safety-sensitive-response-prompt.md), [`prompt-engineering/rapport-prompt.md`](prompt-engineering/rapport-prompt.md), [`prompt-engineering/proactive-outreach-prompt.md`](prompt-engineering/proactive-outreach-prompt.md), [`screenshots`](screenshots), [`test-cases`](test-cases).
 4. 확인 필요로 남긴 항목: 실제 [`.env`](.env) 값, Hugging Face 모델 cache 위치, production 배포 방식, PostgreSQL migration 방식, prompt-engineering 문서와 runtime prompt의 일치 여부, 수동 테스트 이미지 각각의 정확한 시나리오, CSV/로그 산출물 존재 여부.
-5. 내가 다음에 읽어야 할 우선순위 파일 5개: [`backend/src/app.ts`](backend/src/app.ts), [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts), [`scheduler/src/index.ts`](scheduler/src/index.ts), [`backend/src/adapters/mockProvider.ts`](backend/src/adapters/mockProvider.ts), [`backend/src/db/store.ts`](backend/src/db/store.ts).
+5. 내가 다음에 읽어야 할 우선순위 파일 5개: [`backend/src/app.ts`](backend/src/app.ts), [`backend/src/engine/orchestrator.ts`](backend/src/engine/orchestrator.ts), [`scheduler/src/index.ts`](scheduler/src/index.ts), [`backend/src/adapters/hfLocalProvider.ts`](backend/src/adapters/hfLocalProvider.ts), [`backend/src/db/store.ts`](backend/src/db/store.ts).

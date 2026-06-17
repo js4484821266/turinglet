@@ -85,15 +85,56 @@ HOST = os.getenv("HF_LOCAL_HOST", "127.0.0.1")
 PORT = int(os.getenv("HF_LOCAL_PORT", "8010"))
 
 
+def _validate_local_model_file(local_path: Path) -> None:
+    if not local_path.exists():
+        raise FileNotFoundError(f"model file does not exist: {local_path}")
+    if not local_path.is_file():
+        raise ValueError(f"model path is not a file: {local_path}")
+    if local_path.stat().st_size <= 0:
+        raise ValueError(f"model file is empty: {local_path}")
+    if local_path.suffix.lower() != ".gguf":
+        raise ValueError(
+            f"model file must be a GGUF file for llama-cpp-python: {local_path}"
+        )
+
+
+def _download_model() -> Path:
+    MODEL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        downloaded_path = Path(
+            hf_hub_download(
+                repo_id=MODEL_REPO,
+                filename=MODEL_FILE,
+                cache_dir=str(MODEL_CACHE_DIR),
+            )
+        )
+        _validate_local_model_file(downloaded_path)
+        return downloaded_path
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to download model '{MODEL_FILE}' from '{MODEL_REPO}'. "
+            "Check your internet connection, set HF_MODEL_PATH to a local GGUF file, "
+            "or adjust HF_MODEL_REPO / HF_MODEL_FILE."
+        ) from exc
+
+
 def _resolve_model_path() -> Path:
     if MODEL_PATH:
         local_path = _repo_relative_path(MODEL_PATH)
-        if not local_path.exists():
-            raise FileNotFoundError(
-                f"HF_MODEL_PATH points to a missing file: {local_path}. "
-                "Set it to an existing local GGUF model path."
+        try:
+            _validate_local_model_file(local_path)
+            return local_path
+        except Exception as exc:
+            if not ALLOW_MODEL_DOWNLOAD:
+                raise RuntimeError(
+                    f"HF_MODEL_PATH is not a valid local GGUF model: {local_path}. "
+                    "Set it to a loadable GGUF file, or set HF_ALLOW_MODEL_DOWNLOAD=true "
+                    "with valid HF_MODEL_REPO / HF_MODEL_FILE."
+                ) from exc
+            logger.warning(
+                "Configured HF_MODEL_PATH is not valid; trying Hugging Face download: %s",
+                exc,
             )
-        return local_path
 
     if not ALLOW_MODEL_DOWNLOAD:
         raise RuntimeError(
@@ -102,30 +143,19 @@ def _resolve_model_path() -> Path:
             f"the cache directory will be {MODEL_CACHE_DIR}."
         )
 
-    MODEL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    try:
-        return Path(
-            hf_hub_download(
-                repo_id=MODEL_REPO,
-                filename=MODEL_FILE,
-                cache_dir=str(MODEL_CACHE_DIR),
-            )
-        )
-    except Exception as exc:
-        raise RuntimeError(
-            f"Failed to download model '{MODEL_FILE}' from '{MODEL_REPO}'. "
-            "Check your internet connection, set HF_MODEL_PATH to a local file, "
-            "or adjust HF_MODEL_REPO / HF_MODEL_FILE."
-        ) from exc
+    return _download_model()
 
 
 _model_path = _resolve_model_path()
-llm = Llama(
-    model_path=str(_model_path),
-    n_ctx=2048,
-    n_threads=max(1, (os.cpu_count() or 4) // 2),
-    verbose=False,
-)
+try:
+    llm = Llama(
+        model_path=str(_model_path),
+        n_ctx=2048,
+        n_threads=max(1, (os.cpu_count() or 4) // 2),
+        verbose=False,
+    )
+except Exception as exc:
+    raise RuntimeError(f"Failed to load GGUF model with llama-cpp-python: {_model_path}") from exc
 
 
 def _chat(system: str, user: str, max_tokens: int = 200, temperature: float = 0.7) -> str:
@@ -146,15 +176,6 @@ def _chat(system: str, user: str, max_tokens: int = 200, temperature: float = 0.
     except Exception as e:
         logger.error(f"Chat generation failed: {e}", exc_info=True)
         raise
-
-
-def _safe_chat_with_fallback(system: str, user: str, max_tokens: int = 200, temperature: float = 0.7) -> str:
-    """Chat with error recovery to prevent server crash."""
-    try:
-        return _chat(system, user, max_tokens, temperature)
-    except Exception as e:
-        logger.warning(f"Chat failed, returning generic response: {e}")
-        return "지금은 잠시 생각해야 할 것 같아요. 다시 한 번 말씀해줄 수 있을까요?"
 
 
 def _extract_json(text: str) -> Dict[str, Any]:
@@ -179,7 +200,7 @@ def generate(req: GenerateRequest) -> GenerateResponse:
                 "너는 따뜻하고 자연스러운 상담 도우미다. "
                 "1~2문장만. 공감 + 구체적 질문. 뻔한 말/교훈 금지."
             )
-            result = _safe_chat_with_fallback(system, user_text, max_tokens=100, temperature=0.75)
+            result = _chat(system, user_text, max_tokens=100, temperature=0.75)
             return GenerateResponse(ok=True, result=result)
 
         if req.task == "summary":
@@ -193,7 +214,7 @@ def generate(req: GenerateRequest) -> GenerateResponse:
                 "감정 강도(0~10)와 한 줄 요약을 JSON으로만 출력하라. "
                 '형식: {"emotionalIntensity": N, "summary": "..."}'
             )
-            raw = _safe_chat_with_fallback(system, latest_user, max_tokens=80, temperature=0.1)
+            raw = _chat(system, latest_user, max_tokens=80, temperature=0.1)
             data = _extract_json(raw)
             return GenerateResponse(ok=True, result=data)
 
@@ -205,7 +226,7 @@ def generate(req: GenerateRequest) -> GenerateResponse:
                 "다음 상황에서 침묵 의미를 하나 고르라: crying, organizing_thoughts, "
                 "emotionally_overwhelmed, away, typing\n정답 하나만 출력."
             )
-            raw = _safe_chat_with_fallback(system, json.dumps(req.payload, ensure_ascii=False), max_tokens=16, temperature=0.0).strip()
+            raw = _chat(system, json.dumps(req.payload, ensure_ascii=False), max_tokens=16, temperature=0.0).strip()
             allowed = {"crying", "organizing_thoughts", "emotionally_overwhelmed", "away", "typing"}
             value = raw.split()[0].strip().lower()
             if value not in allowed:
@@ -220,7 +241,7 @@ def generate(req: GenerateRequest) -> GenerateResponse:
             '형식: {"sendCount":1,"reason":"...","nextState":"reflective_pause",'
             '"messages":[{"content":"...","delayMs":600,"presenceBeforeSend":"typing"}]}'
         )
-        raw = _safe_chat_with_fallback(system, user_text, max_tokens=250, temperature=0.6)
+        raw = _chat(system, user_text, max_tokens=250, temperature=0.6)
         data = _extract_json(raw)
 
         msgs = data.get("messages", []) if isinstance(data.get("messages", []), list) else []
@@ -244,23 +265,12 @@ def generate(req: GenerateRequest) -> GenerateResponse:
             )
 
         if not safe_msgs:
-            data = {
-                "sendCount": 1,
-                "reason": "fallback",
-                "nextState": "reflective_pause",
-                "messages": [
-                    {
-                        "content": "지금 얘기해준 부분이 꽤 버겁게 들려요. 제일 먼저 걸리는 장면 하나만 같이 볼까요?",
-                        "delayMs": 600,
-                        "presenceBeforeSend": "typing",
-                    }
-                ],
-            }
-        else:
-            data["messages"] = safe_msgs
-            data["sendCount"] = len(safe_msgs)
-            data["nextState"] = data.get("nextState", "reflective_pause")
-            data["reason"] = str(data.get("reason", "llm_plan"))
+            raise ValueError("Model returned a multi_plan without valid messages")
+
+        data["messages"] = safe_msgs
+        data["sendCount"] = len(safe_msgs)
+        data["nextState"] = data.get("nextState", "reflective_pause")
+        data["reason"] = str(data.get("reason", "llm_plan"))
 
         return GenerateResponse(ok=True, result=data)
 

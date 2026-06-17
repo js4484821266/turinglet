@@ -63,11 +63,20 @@ if [[ -z "${MODEL_PATH}" ]]; then
   MODEL_PATH="${current_model_path:-${DEFAULT_MODEL_PATH}}"
 fi
 
+ALLOW_MODEL_DOWNLOAD="${HF_ALLOW_MODEL_DOWNLOAD:-}"
+if [[ -z "${ALLOW_MODEL_DOWNLOAD}" ]]; then
+  ALLOW_MODEL_DOWNLOAD="$(grep '^HF_ALLOW_MODEL_DOWNLOAD=' "${ENV_FILE}" | tail -n 1 | cut -d= -f2- || true)"
+fi
+case "${ALLOW_MODEL_DOWNLOAD,,}" in
+  1|true|yes|y|on) ALLOW_MODEL_DOWNLOAD="true" ;;
+  *) ALLOW_MODEL_DOWNLOAD="false" ;;
+esac
+
 if [[ "${MODEL_PATH}" != /* ]]; then
   MODEL_PATH="${REPO_ROOT}/${MODEL_PATH}"
 fi
 
-if [[ ! -f "${MODEL_PATH}" ]]; then
+if [[ ! -f "${MODEL_PATH}" && "${ALLOW_MODEL_DOWNLOAD}" != "true" ]]; then
   cat >&2 <<EOF
 Model file is missing:
   ${MODEL_PATH}
@@ -75,16 +84,19 @@ Model file is missing:
 Put a GGUF model file there, or run with:
   sudo env HF_MODEL_PATH=/absolute/path/to/model.gguf bash deploy/cloud-run.sh
 
-This script does not download GGUF or safetensors files.
+Set HF_ALLOW_MODEL_DOWNLOAD=true only if you want the LLM service to try
+downloading HF_MODEL_REPO / HF_MODEL_FILE during startup.
 EOF
   exit 1
 fi
 
-upsert_env LLM_PROVIDER hf-local
-upsert_env MOCK_PROVIDER false
 upsert_env HF_LOCAL_URL http://127.0.0.1:8010
-upsert_env HF_MODEL_PATH "${MODEL_PATH}"
-upsert_env HF_ALLOW_MODEL_DOWNLOAD false
+if [[ -f "${MODEL_PATH}" ]]; then
+  upsert_env HF_MODEL_PATH "${MODEL_PATH}"
+else
+  upsert_env HF_MODEL_PATH ""
+fi
+upsert_env HF_ALLOW_MODEL_DOWNLOAD "${ALLOW_MODEL_DOWNLOAD}"
 upsert_env PORT 80
 chown "${DEPLOY_USER}:${DEPLOY_GROUP}" "${ENV_FILE}"
 

@@ -12,7 +12,6 @@
   "scripts": {
     "predev": "npm run build -w shared && npm run build -w scheduler && npm run build -w database && npm run migrate",
     "dev": "concurrently --kill-others --kill-others-on-fail \"npm run dev -w backend\" \"npm run dev -w frontend\"",
-    "dev:mock": "cross-env LLM_PROVIDER=mock MOCK_PROVIDER=true npm run dev",
     "dev:llm:windows": "concurrently --kill-others --kill-others-on-fail \"npm run llm:server:windows\" \"npm run dev\"",
     "dev:llm:debian": "concurrently --kill-others --kill-others-on-fail \"npm run llm:server:debian\" \"npm run dev\"",
     "dev:server": "npm run dev -w backend",

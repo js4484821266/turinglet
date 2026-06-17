@@ -77,8 +77,7 @@
 | --- | --- | --- |
 | 환경 파일 생성 | `Copy-Item .env.example .env -Force` | `cp .env.example .env` |
 | Python 가상환경 활성화 | `.\.venv-llm\Scripts\Activate.ps1` | `source .venv-llm/bin/activate` |
-| Mock 개발 실행 | `npm run dev:mock` | `npm run dev:mock` |
-| GGUF 개발 실행 | `npm run dev:llm:windows` | `npm run dev:llm:debian` |
+| GGUF 모델 실행 | `npm run dev:llm:windows` | `npm run dev:llm:debian` |
 
 ### `.env` 설정
 
@@ -96,26 +95,14 @@ Debian Bash:
 cp .env.example .env
 ```
 
-#### MockProvider로 실행
-
-별도 GGUF 모델이나 Python LLM 서버 없이 규칙 기반 응답으로 앱을 실행합니다. UI, 인증, DB, 메시지 전송 흐름을 빠르게 개발하거나 테스트할 때 사용합니다.
-
-```env
-LLM_PROVIDER=mock
-MOCK_PROVIDER=true
-```
-
-이 모드에서는 LLM 서버를 실행할 필요 없이 `npm run dev:mock`만 실행하면 됩니다.
-
 #### 로컬 GGUF 모델로 실행
 
-백엔드가 FastAPI LLM 서버를 호출하도록 설정합니다.
+삼마고는 로컬 FastAPI LLM 서버를 필수로 사용합니다. mock 모드는 없으며, 모델을 로드하지 못하면 LLM 서버와 앱 실행이 실패합니다.
 
 ```env
-LLM_PROVIDER=hf-local
-MOCK_PROVIDER=false
 HF_LOCAL_URL=http://127.0.0.1:8010
 HF_LOCAL_TIMEOUT_MS=30000
+HF_LOCAL_STARTUP_WAIT_MS=120000
 ```
 
 이미 받은 GGUF 파일을 사용할 때:
@@ -139,7 +126,7 @@ HF_MODEL_FILE=qwen2.5-0.5b-instruct-q4_k_m.gguf
 
 이 설정은 `huggingface-cli download Qwen/Qwen2.5-0.5B-Instruct-GGUF --include "Qwen2.5-0.5B-Instruct-Q4_K_M.gguf" --local-dir ./models`와 같은 목적의 모델 준비를 앱 실행 시점에 수행합니다. 구현은 `huggingface_hub.hf_hub_download()`를 사용하므로 실제 저장 경로는 `HF_MODEL_CACHE_DIR` 아래 Hugging Face cache 구조가 됩니다.
 
-`LLM_PROVIDER`가 현재 provider 선택의 기준입니다. `MOCK_PROVIDER`는 이전 설정과의 호환을 위해 남아 있으며, `LLM_PROVIDER`가 없거나 올바르지 않을 때만 provider 선택에 영향을 줍니다. 다만 `hf-local` 사용 중 LLM 요청이 실패하거나 timeout이 발생하면 서비스 중단을 피하기 위해 내부적으로 `MockProvider` 응답을 fallback으로 사용합니다.
+모델 검사는 로컬 경로를 먼저 봅니다. `HF_MODEL_PATH`가 유효한 `.gguf` 파일이면 그 파일을 로드합니다. 로컬 경로가 비었거나 유효하지 않은 경우에는 `HF_ALLOW_MODEL_DOWNLOAD=true`일 때만 `HF_MODEL_REPO`와 `HF_MODEL_FILE`로 Hugging Face 다운로드를 시도합니다. 두 조건 모두 실패하면 실행은 중단됩니다. safetensors는 현재 `llama-cpp-python` 경로에서 직접 로드하지 않으므로 GGUF로 변환해야 합니다.
 
 그 밖의 포트, SQLite 경로, 응답 시간과 선제 발화 설정은 [`.env.example`](.env.example)을 기준으로 조정합니다. `.env`에는 비밀값이나 환경별 경로가 들어갈 수 있으므로 Git에 커밋하지 않습니다.
 
@@ -157,13 +144,7 @@ npm install
 Copy-Item .env.example .env -Force
 ```
 
-위의 `.env` 설정에서 `mock` 또는 `hf-local` 모드를 선택합니다. `mock`이면 다음 LLM 설치·실행 단계는 건너뜁니다.
-
-준비가 끝난 뒤 mock provider로 한 번에 실행:
-
-```powershell
-npm run dev:mock
-```
+위의 `.env` 설정에서 유효한 GGUF 파일 경로나 Hugging Face 다운로드 설정을 준비합니다. 모델 준비가 끝나지 않으면 실행은 실패합니다.
 
 #### 3) 로컬 LLM 서버 실행
 
@@ -211,7 +192,7 @@ npm run migrate
 npm run dev
 ```
 
-`npm run dev:mock`과 `npm run dev:llm:windows`는 내부에서 migration과 개발 서버 실행을 함께 처리합니다.
+`npm run dev:llm:windows`는 내부에서 migration, LLM 서버, 개발 서버 실행을 함께 처리합니다.
 
 기본 주소
 
@@ -285,14 +266,13 @@ npm run migrate
 npm run dev
 ```
 
-준비가 끝난 뒤 한 줄로 실행하려면 다음 중 하나를 사용합니다.
+준비가 끝난 뒤 한 줄로 실행하려면 다음을 사용합니다.
 
 ```bash
-npm run dev:mock
 npm run dev:llm:debian
 ```
 
-`dev:mock`은 LLM 서버를 띄우지 않고, `dev:llm:debian`은 LLM 서버와 앱을 같은 터미널에서 함께 실행합니다.
+`dev:llm:debian`은 LLM 서버와 앱을 같은 터미널에서 함께 실행합니다. 모델 로드 또는 다운로드가 실패하면 전체 실행이 중단됩니다.
 
 ```bash
 curl http://127.0.0.1:8010/health
@@ -303,7 +283,7 @@ curl http://127.0.0.1:4000/api/health
 
 ### 클라우드 Debian/Ubuntu 한 줄 실행
 
-클라우드 서버에서는 repo를 clone한 뒤 모델 파일을 직접 넣습니다. 이 스크립트는 GGUF나 safetensors를 다운로드하지 않습니다. 현재 LLM 서버는 `llama-cpp-python` 기반이므로 바로 로드할 수 있는 형식은 GGUF입니다. safetensors를 쓰려면 별도 변환 또는 다른 추론 서버가 필요합니다.
+클라우드 서버에서는 repo를 clone한 뒤 모델 파일을 직접 넣는 방식을 기본으로 사용합니다. `HF_ALLOW_MODEL_DOWNLOAD=true`를 명시하지 않으면 스크립트는 GGUF나 safetensors를 다운로드하지 않습니다. 현재 LLM 서버는 `llama-cpp-python` 기반이므로 바로 로드할 수 있는 형식은 GGUF입니다. safetensors를 쓰려면 별도 변환 또는 다른 추론 서버가 필요합니다.
 
 기본 위치:
 
