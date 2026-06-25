@@ -1,3 +1,8 @@
+/**
+ * SQLite 세션 생성·조회·활성 갱신 쿼리를 담당한다.
+ * 세션 ID와 last_seen_at은 인증 및 proactive 대상 조회의 기준이다.
+ */
+
 import type Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import type { SessionRecord } from './types.js';

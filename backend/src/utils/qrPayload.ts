@@ -1,3 +1,8 @@
+/**
+ * QR에 담기는 식별 payload를 접두사와 base64url 형식으로 인코딩·검증한다.
+ * 잘못된 접두사나 Zod 스키마 불일치는 로그인 경로에 예외로 전달한다.
+ */
+
 import { z } from 'zod';
 
 const QrSchema = z.object({

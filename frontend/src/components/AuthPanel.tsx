@@ -1,3 +1,8 @@
+/**
+ * QR 등록·로그인·복구용 화면 입력과 API 호출을 관리한다.
+ * QR 파싱 또는 네트워크 실패는 사용자 오류 상태로 표시하고 인증 상태를 임의로 만들지 않는다.
+ */
+
 import { useMemo, useState } from 'react';
 import { BrowserQRCodeReader } from '@zxing/browser';
 import { api } from '../api';

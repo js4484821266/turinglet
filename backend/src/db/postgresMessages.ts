@@ -1,3 +1,8 @@
+/**
+ * PostgreSQL 메시지·감정 snapshot 저장과 대화 snapshot 조립을 담당한다.
+ * 쿼리 결과를 공유 MessageRecord와 ConversationSnapshot으로 변환한다.
+ */
+
 import type { Pool } from 'pg';
 import type { ConversationSnapshot, MessageRecord, Role } from '@turinglet/shared';
 import { v4 as uuidv4 } from 'uuid';

@@ -149,8 +149,35 @@ except Exception as exc:
 LLM_LOCK = Lock()
 
 
+def _extract_chat_content(output: Any) -> str:
+    """llama-cpp 응답에서 첫 assistant 문자열을 구조 검증 후 반환한다."""
+    if not isinstance(output, dict):
+        raise TypeError("Chat completion output must be a dictionary")
+
+    choices = output.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise ValueError("Chat completion output has no choices")
+
+    first_choice = choices[0]
+    if not isinstance(first_choice, dict):
+        raise TypeError("Chat completion choice must be a dictionary")
+
+    message = first_choice.get("message")
+    if not isinstance(message, dict):
+        raise TypeError("Chat completion choice has no message object")
+
+    content = message.get("content")
+    if not isinstance(content, str):
+        raise TypeError("Chat completion message content must be a string")
+
+    result = content.strip()
+    if not result:
+        raise ValueError("Chat completion returned empty content")
+    return result
+
+
 def _chat(system: str, user: str, max_tokens: int = 200, temperature: float = 0.7) -> str:
-    """Generate a response using the chat-completion interface."""
+    """공유 Llama 인스턴스를 잠근 뒤 검증된 assistant 문자열을 생성한다."""
     try:
         # llama-cpp-python shares native state inside the Llama object. FastAPI
         # can run sync handlers concurrently, so serialize generation calls to
@@ -166,10 +193,9 @@ def _chat(system: str, user: str, max_tokens: int = 200, temperature: float = 0.
                 top_p=0.9,
                 repeat_penalty=1.05,
             )
-        result = output["choices"][0]["message"]["content"].strip()  # type: ignore[index]
-        return result
-    except Exception as e:
-        logger.error(f"Chat generation failed: {e}", exc_info=True)
+        return _extract_chat_content(output)
+    except Exception as exc:
+        logger.error(f"Chat generation failed: {exc}", exc_info=True)
         raise
 
 
@@ -252,7 +278,7 @@ def _summary_from_model_text(raw: str, latest_user: str) -> Dict[str, Any]:
     return {"emotionalIntensity": 5, "summary": text}
 
 
-def _plan_from_model_text(raw: str, user_text: str) -> Dict[str, Any]:
+def _plan_from_model_text(raw: str) -> Dict[str, Any]:
     data = _try_extract_json(raw)
     if data:
         return data
@@ -325,17 +351,20 @@ def generate(req: GenerateRequest) -> GenerateResponse:
         # multi_plan
         user_text = (req.payload.get("userText") or "").strip()[:300]
         system = (
-            "JSON만 출력. 사용자가 말을 이어갈 것 같으면 sendCount=0, 아니면 1~2개 짧은 메시지.\n"
-            "공감+구체적 질문, 뻔한 말 금지.\n"
+            "JSON만 출력. 사용자가 말을 이어갈 것 같으면 sendCount=0, "
+            "아니면 맥락에 맞는 개수의 짧은 메시지로 자연스럽게 나눠라.\n"
+            "필요하면 3개 이상으로 나눌 수 있다. 공감+구체적 질문, 뻔한 말 금지.\n"
             '형식: {"sendCount":1,"reason":"...","nextState":"reflective_pause",'
             '"messages":[{"content":"...","delayMs":600,"presenceBeforeSend":"typing"}]}'
         )
-        raw = _chat(system, user_text, max_tokens=250, temperature=0.6)
-        data = _plan_from_model_text(raw, user_text)
+        raw = _chat(system, user_text, max_tokens=400, temperature=0.6)
+        data = _plan_from_model_text(raw)
 
         msgs = data.get("messages", []) if isinstance(data.get("messages", []), list) else []
         safe_msgs: List[Dict[str, Any]] = []
-        for item in msgs[:2]:
+        # 메시지 개수는 고정 상한을 두지 않는다. 각 항목만 개별 검증해
+        # 사람이 여러 말풍선으로 나누어 말하는 계획을 그대로 보존한다.
+        for item in msgs:
             if not isinstance(item, dict):
                 continue
             content = str(item.get("content", "")).strip()

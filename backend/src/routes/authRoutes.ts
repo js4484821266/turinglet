@@ -1,3 +1,8 @@
+/**
+ * QR 등록·로그인·복구 API를 Store와 보안 유틸리티에 연결한다.
+ * 토큰 검증 또는 DB 오류를 정상 로그인으로 처리하지 않는다.
+ */
+
 import type express from 'express';
 import QRCode from 'qrcode';
 import type { Store } from '../db/store.js';

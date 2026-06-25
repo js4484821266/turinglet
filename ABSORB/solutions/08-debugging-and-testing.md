@@ -26,3 +26,11 @@ proactive loop에서 한 세션 오류를 전체 실패로 처리하면, 한 사
 - typing 중이면 재예약되는지 확인
 - max wait 이후 forced plan으로 넘어가는지 확인
 - 기존 `policy.test.ts`에 continuation 예시를 추가
+
+## 5. 오류 찾기
+
+1. [../../local-llm/server.py](../../local-llm/server.py)에 `msgs[:2]` 같은 절단이 없는지 확인한다.
+2. [../../backend/src/adapters/hfLocalValidation.ts](../../backend/src/adapters/hfLocalValidation.ts)의 정규화 뒤 `messages.length`와 `sendCount`를 확인한다.
+3. [../../backend/src/runtime/messageQueue.ts](../../backend/src/runtime/messageQueue.ts)가 배열 전체에 `map`으로 timer를 만드는지 확인한다.
+4. 각 timer 실행 시점의 `isUserTyping` 값을 확인한다. typing이 true였다면 누락이 아니라 끼어들기 방지 정책일 수 있다.
+5. DB에 저장된 assistant 메시지 수와 Socket.IO 수신 수를 비교해 저장 단계와 화면 전달 단계를 분리한다.

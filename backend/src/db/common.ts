@@ -1,3 +1,8 @@
+/**
+ * 두 DB adapter가 공유하는 상태 변환, JSON 파싱, repo 탐색, row 변환을 제공한다.
+ * 손상된 metadata JSON은 메시지 본문 조회를 막지 않도록 undefined로 격리한다.
+ */
+
 import fs from 'node:fs';
 import path from 'node:path';
 import type { MessageRecord, Role, SessionMachineState } from '@turinglet/shared';

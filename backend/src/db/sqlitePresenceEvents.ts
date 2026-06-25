@@ -1,3 +1,8 @@
+/**
+ * SQLite typing presence와 proactive event의 저장·조회 쿼리를 담당한다.
+ * typing 값은 메시지 전송 직전 정책 판단에 사용되는 최신 상태다.
+ */
+
 import type Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 

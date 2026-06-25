@@ -1,3 +1,8 @@
+/**
+ * 실행별 관리자 인증에 쓰는 64×64 비인코딩 BMP를 생성·검증·저장한다.
+ * 출력은 repo 내부 runtime 경로에만 쓰며 크기나 헤더 변경은 관리자 인증과 테스트에 영향 준다.
+ */
+
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';

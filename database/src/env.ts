@@ -1,3 +1,8 @@
+/**
+ * 실행 위치와 무관하게 repo 루트를 찾아 SQLite 경로를 절대 경로로 해석한다.
+ * 잘못된 package.json은 상위 탐색을 계속하며 루트를 찾지 못하면 현재 경로를 기준으로 삼는다.
+ */
+
 import fs from 'node:fs';
 import path from 'node:path';
 

@@ -1,3 +1,8 @@
+/**
+ * 요청 헤더의 세션 ID를 Store의 사용자 세션과 대조하는 인증 경계다.
+ * 실패 시 401 응답을 끝내고 성공한 경우에만 sessionId와 userId를 반환한다.
+ */
+
 import type { Request, Response } from 'express';
 import type { Store } from '../db/store.js';
 

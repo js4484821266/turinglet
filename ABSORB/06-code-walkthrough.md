@@ -14,7 +14,7 @@
 
 - 백엔드 route 파일은 왜 직접 LLM을 호출하지 않고 planner를 호출할까요?
 - 메시지 큐가 별도 파일로 분리된 이유는 무엇일까요?
-- 로컬 LLM 서버가 JSON을 못 만들 때 Python과 TypeScript 양쪽에서 어떤 방어가 있나요?
+- 로컬 LLM 서버가 JSON 형식을 지키지 못하거나 잘못된 메시지 배열을 만들 때 Python과 TypeScript 양쪽에서 어떤 방어가 있나요?
 
 ## 1단계: 공통 타입부터 읽기
 
@@ -182,21 +182,41 @@
 
 필요한 이유:
 
-- 실제 모델 호출과 JSON fallback을 담당합니다.
+- 실제 모델 호출, 응답 구조 검사, 작업별 JSON 형식 복구를 담당합니다.
 
 중요 처리:
 
 - `.env`를 직접 읽습니다.
 - GGUF 파일을 검증합니다.
 - `LLM_LOCK`으로 동시 생성을 직렬화합니다.
-- JSON 추출 실패 시 일부 task에서 안전한 fallback을 만듭니다.
+- `choices[0].message.content` 구조와 빈 문자열을 명시적으로 검사합니다.
+- JSON 추출 실패 시 일부 task에서 같은 모델의 텍스트를 작업 형식으로 복구합니다. 이는 mock 또는 다른 provider fallback이 아닙니다.
+- multi-plan 메시지는 2개로 자르지 않고 유효한 항목을 모두 보존합니다.
+
+원본: [../local-llm/server.py](../local-llm/server.py), multi-plan 메시지 정규화 구간
+
+```python
+        msgs = data.get("messages", []) if isinstance(data.get("messages", []), list) else []
+        safe_msgs: List[Dict[str, Any]] = []
+        # 메시지 개수는 고정 상한을 두지 않는다. 각 항목만 개별 검증해
+        # 사람이 여러 말풍선으로 나누어 말하는 계획을 그대로 보존한다.
+        for item in msgs:
+            if not isinstance(item, dict):
+                continue
+            content = str(item.get("content", "")).strip()
+            if not content:
+                continue
+```
+
+이 구간의 입력은 모델이 만든 unknown JSON 배열입니다. 출력은 뒤에서 `data["messages"] = safe_msgs`, `data["sendCount"] = len(safe_msgs)`로 확정됩니다. 항목이 하나도 남지 않으면 정상 계획처럼 포장하지 않고 `ValueError`가 발생합니다.
 
 ## 실습
 
 1. 위 10단계를 따라 파일을 열고, 각 파일에서 가장 중요한 함수 이름 1개를 적습니다.
 2. `POST /api/chat/messages` 흐름에 직접 관여하지 않는 파일을 골라 이유를 설명합니다.
 3. `sendCount: 0`이 queue까지 가지 않는 경로를 코드로 추적합니다.
-4. `proactiveLoop.ts`의 session별 try/catch가 왜 필요한지 설명합니다.
+4. 모델이 4개 메시지를 반환했다고 가정하고 Python 정규화와 TypeScript 정규화를 지난 뒤 개수가 어떻게 유지되는지 설명합니다.
+5. `proactiveLoop.ts`의 session별 try/catch가 왜 필요한지 설명합니다.
 
 ## 이해 확인 퀴즈
 

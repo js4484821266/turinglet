@@ -64,6 +64,24 @@ curl http://127.0.0.1:4000/api/health
 
 이 테스트들은 QR 인증, 관리자 인증 같은 진입 흐름을 보호합니다.
 
+파일: [../backend/tests/message-plan.test.ts](../backend/tests/message-plan.test.ts)
+
+이 테스트는 외부 GGUF 모델 없이 다음 실행 불변식을 고정합니다.
+
+- 유효한 메시지가 3개 이상이어도 2개로 잘리지 않는다.
+- 모델이 적은 `sendCount`가 실제 배열과 달라도 유효 메시지 수로 다시 계산한다.
+- queue는 3개 이상의 각 `delayMs` timer를 실행한다.
+- 첫 메시지 뒤 사용자가 typing을 시작하면 뒤의 지연 메시지는 저장·전송하지 않는다.
+
+원본 테스트 구간:
+
+```ts
+    expect(plan?.sendCount).toBe(3);
+    expect(plan?.messages.map((message) => message.content)).toEqual(['첫 번째', '두 번째', '세 번째']);
+```
+
+이 검증은 계획 정규화와 queue를 확인하지만 실제 모델이 좋은 문장을 생성하는지는 검증하지 않습니다.
+
 ## 흔한 문제 분류
 
 | 증상 | 먼저 볼 곳 | 가능한 원인 |
@@ -92,6 +110,7 @@ curl http://127.0.0.1:4000/api/health
 2. `evaluateProactiveDecision`에 새 조건을 추가한다고 가정하고 필요한 테스트 케이스를 2개 적습니다.
 3. 모델 파일이 없을 때와 payload 검증 실패 때의 확인 위치를 각각 적습니다.
 4. "선제 발화가 안 온다"는 이슈를 받았을 때 정상 정책인지 버그인지 구분하는 질문 4개를 만듭니다.
+5. [../backend/tests/message-plan.test.ts](../backend/tests/message-plan.test.ts)의 typing 테스트에서 `userTyping = true`가 어느 timer 사이에 바뀌는지 추적합니다.
 
 ## 이해 확인 퀴즈
 
@@ -99,6 +118,7 @@ curl http://127.0.0.1:4000/api/health
 2. 적용: POST `/api/chat/messages`가 202인데 assistant 메시지가 오지 않을 때 확인 순서를 쓰세요.
 3. 변형: proactive loop에서 한 세션 오류를 전체 실패로 처리하면 어떤 문제가 생기나요?
 4. 독립 수행: `USER_CONTINUATION_GRACE_MS` 변경에 대한 테스트 전략을 제안하세요.
+5. 오류 찾기: 모델이 4개 메시지를 반환했는데 화면에는 2개만 보인다면 Python 정규화, TypeScript 정규화, queue, typing 상태를 어떤 순서로 확인해야 하나요?
 
 해설: [solutions/08-debugging-and-testing.md](solutions/08-debugging-and-testing.md)
 

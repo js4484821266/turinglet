@@ -1,3 +1,8 @@
+/**
+ * PostgreSQL typing presence upsert와 proactive event 조회·기록을 담당한다.
+ * 세션별 최신 typing 값은 지연 메시지 전송 여부를 결정한다.
+ */
+
 import type { Pool } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 

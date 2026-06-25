@@ -1,3 +1,8 @@
+/**
+ * 실행 시 생성된 BMP 키로 인증하고 관리자 관찰 데이터를 조회하는 화면이다.
+ * 관리자 token은 sessionStorage에만 두며 인증 실패 시 화면 상태를 초기화한다.
+ */
+
 import { useEffect, useState } from 'react';
 import { api, type AdminProactiveEventRow, type AdminSessionRow, type AdminUserRow, type ChatMessage } from '../api';
 

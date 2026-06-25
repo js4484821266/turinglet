@@ -1,3 +1,8 @@
+/**
+ * repo .env를 읽어 backend의 포트·DB·시간 정책·LLM 연결 설정을 만든다.
+ * 숫자 환경 변수가 없거나 유효하지 않으면 코드의 명시된 기본값을 사용한다.
+ */
+
 import path from 'node:path';
 import dotenv from 'dotenv';
 

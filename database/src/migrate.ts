@@ -1,3 +1,8 @@
+/**
+ * SQL migration 파일을 순서대로 SQLite에 적용하는 CLI 진입점이다.
+ * 적용 이력은 schema_migrations에 기록하며 SQL 또는 파일 오류는 호출자에게 드러낸다.
+ */
+
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';

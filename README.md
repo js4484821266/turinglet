@@ -32,6 +32,7 @@
 - 반응 메시지 수가 고정되지 않습니다.
 - 봇이 보내는 반응 메시지 개수는 상황에 따라 0개, 1개, 여러 개가 될 수 있습니다.
 - 봇 반응은 최대 2개로 제한된 구조가 아니라, 맥락에 따라 여러 개로 나눠 보낼 수 있습니다.
+- 로컬 LLM이 반환한 계획은 빈 항목을 제거한 뒤 유효한 모든 메시지를 지연 전송 큐에 넘기며, `sendCount`는 실제 유효 메시지 수로 다시 계산합니다.
 
 ## 주요 기능
 
@@ -370,7 +371,7 @@ curl http://127.0.0.1/api/health
 - Frontend: React, TypeScript, Vite, Zustand, socket.io-client
 - Backend: Node.js, Express, Socket.IO, TypeScript, Zod
 - Database: SQLite(기본), PostgreSQL(선택)
-- Local LLM: FastAPI, llama-cpp-python, Hugging Face Hub
+- Local LLM: FastAPI, llama-cpp-python, 사전에 준비한 로컬 GGUF 모델
 - Test: Vitest, Supertest
 
 ## 프로젝트 의의 / 한계

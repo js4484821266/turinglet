@@ -1,3 +1,8 @@
+/**
+ * 실행별 BMP 관리자 키의 형식과 보호 route 인증을 검증한다.
+ * 임시 SQLite DB와 주입된 bitmap을 사용해 외부 파일 의존성을 줄인다.
+ */
+
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';

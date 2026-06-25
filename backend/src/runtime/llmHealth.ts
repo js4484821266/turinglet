@@ -1,3 +1,8 @@
+/**
+ * backend가 포트를 열기 전에 로컬 LLM health 준비를 반복 확인한다.
+ * 제한 시간을 넘기면 마지막 연결 오류를 포함한 예외로 시작을 중단한다.
+ */
+
 import { config } from '../config.js';
 
 function sleep(ms: number): Promise<void> {

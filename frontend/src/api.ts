@@ -1,3 +1,8 @@
+/**
+ * REST와 Socket.IO가 공유할 backend origin 및 화면용 응답 타입을 정의한다.
+ * 개발에서는 현재 브라우저 host의 4000 포트를, production에서는 동일 origin을 사용한다.
+ */
+
 import axios from 'axios';
 
 const configuredBackendOrigin = import.meta.env.VITE_BACKEND_ORIGIN?.trim();

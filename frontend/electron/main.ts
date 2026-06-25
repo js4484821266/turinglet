@@ -1,3 +1,8 @@
+/**
+ * 개발용 Vite 화면을 Electron 창으로 열고 서버 준비 지연을 제한적으로 재시도한다.
+ * 모든 재시도가 실패하면 창을 강제 종료하지 않고 마지막 loadURL 오류를 기록한다.
+ */
+
 import { app, BrowserWindow } from 'electron';
 
 const startUrl = process.env.ELECTRON_START_URL ?? 'http://localhost:5173';
@@ -13,15 +18,20 @@ async function createWindow(): Promise<void> {
   });
 
   let retries = 0;
+  let lastLoadError: unknown;
   while (retries < 30) {
     try {
       await win.loadURL(startUrl);
-      break;
-    } catch {
+      return;
+    } catch (error) {
+      lastLoadError = error;
       retries += 1;
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      if (retries < 30) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
     }
   }
+  console.error(`Electron could not load ${startUrl} after ${retries} attempts.`, lastLoadError);
 }
 
 app.whenReady().then(() => {

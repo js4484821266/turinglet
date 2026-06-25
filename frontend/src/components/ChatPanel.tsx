@@ -1,3 +1,8 @@
+/**
+ * 인증된 세션의 REST 전송, Socket.IO 수신, typing 수명주기를 연결한다.
+ * typing 전송 실패는 기록하되 사용자 메시지 작성과 전송을 차단하지 않는다.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { io } from 'socket.io-client';
@@ -54,8 +59,10 @@ export function ChatPanel() {
   const sendTyping = async (isTyping: boolean) => {
     try {
       await api.post('/chat/typing', { isTyping }, { headers: { 'x-session-id': sessionId } });
-    } catch {
-      // Typing is advisory; losing it should never block message delivery.
+    } catch (error) {
+      // Typing은 보조 신호이므로 메시지 입력을 막지는 않지만, 끼어들기 정책이
+      // 부정확해질 수 있어 개발자 도구에서 실패 원인을 확인할 수 있게 남긴다.
+      console.warn('Typing presence update failed; message delivery continues.', error);
     }
   };
 

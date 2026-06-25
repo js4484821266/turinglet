@@ -1,3 +1,8 @@
+/**
+ * Socket.IO 서버와 세션 room 기반 message·presence emitter를 만든다.
+ * 연결 전 emit은 선택적으로 무시되며 영속 저장은 이 모듈의 책임이 아니다.
+ */
+
 import type { Server as HttpServer } from 'node:http';
 import type { MessageRecord, PresenceState } from '@turinglet/shared';
 import { Server } from 'socket.io';

@@ -8,7 +8,7 @@
 
 ## 앞 문서와의 연결
 
-[11-explain-it-yourself.md](11-explain-it-yourself.md)까지는 프로젝트 전체를 설명하는 연습이었습니다. 이번 장에서는 그 설명을 실제 코드로 증명합니다. 아래 스니펫은 2026-06-25 현재 링크된 원본 파일에서 그대로 가져왔습니다. 생략한 import나 주변 코드는 스니펫 위에 범위를 표시하며, 코드 자체를 설명용으로 고쳐 쓰지 않았습니다.
+[11-explain-it-yourself.md](11-explain-it-yourself.md)까지는 프로젝트 전체를 설명하는 연습이었습니다. 이번 장에서는 그 설명을 실제 코드로 증명합니다. 아래 스니펫은 2026-06-26 현재 링크된 원본 파일에서 그대로 가져왔습니다. 생략한 import나 주변 코드는 스니펫 위에 범위를 표시하며, 코드 자체를 설명용으로 고쳐 쓰지 않았습니다.
 
 ## 먼저 생각해 볼 질문
 
@@ -170,20 +170,43 @@ const timers = input.messages.map((item) =>
 
 확인 질문: `isUserTyping()` 검사를 plan 생성 시점에만 하면 왜 충분하지 않은가요?
 
-## 6. Python 모델 호출 직렬화
+## 6. Python 모델 호출 직렬화와 응답 구조 검사
 
-원본: [../local-llm/server.py](../local-llm/server.py), `LLM_LOCK`과 `_chat()` 일부
+원본: [../local-llm/server.py](../local-llm/server.py), `_extract_chat_content()`
 
 ```python
-LLM_LOCK = Lock()
+def _extract_chat_content(output: Any) -> str:
+    """llama-cpp 응답에서 첫 assistant 문자열을 구조 검증 후 반환한다."""
+    if not isinstance(output, dict):
+        raise TypeError("Chat completion output must be a dictionary")
 
+    choices = output.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise ValueError("Chat completion output has no choices")
 
-def _chat(system: str, user: str, max_tokens: int = 200, temperature: float = 0.7) -> str:
-    """Generate a response using the chat-completion interface."""
-    try:
-        # llama-cpp-python shares native state inside the Llama object. FastAPI
-        # can run sync handlers concurrently, so serialize generation calls to
-        # avoid ggml asserts from overlapping requests.
+    first_choice = choices[0]
+    if not isinstance(first_choice, dict):
+        raise TypeError("Chat completion choice must be a dictionary")
+
+    message = first_choice.get("message")
+    if not isinstance(message, dict):
+        raise TypeError("Chat completion choice has no message object")
+
+    content = message.get("content")
+    if not isinstance(content, str):
+        raise TypeError("Chat completion message content must be a string")
+
+    result = content.strip()
+    if not result:
+        raise ValueError("Chat completion returned empty content")
+    return result
+```
+
+이 함수는 `type: ignore`로 모델 응답 형태를 가정하지 않습니다. 각 중간 값의 자료형과 빈 배열·빈 문자열을 검사합니다. 입력은 llama-cpp가 반환한 unknown 객체이고, 출력은 공백을 제거한 assistant 문자열입니다. 구조가 다르면 구체적인 예외가 발생해 `_chat()` 로그에 stack trace가 남습니다.
+
+원본: [../local-llm/server.py](../local-llm/server.py), `_chat()`의 모델 호출 구간
+
+```python
         with LLM_LOCK:
             output = llm.create_chat_completion(
                 messages=[
@@ -195,13 +218,66 @@ def _chat(system: str, user: str, max_tokens: int = 200, temperature: float = 0.
                 top_p=0.9,
                 repeat_penalty=1.05,
             )
+        return _extract_chat_content(output)
 ```
 
-FastAPI가 여러 요청을 받을 수 있어도 전역 `Llama` 객체의 native 추론 상태는 안전하게 겹쳐 쓸 수 없다는 전제입니다. lock은 한 번에 한 생성만 실행해 처리량을 낮추는 대신 `GGML_ASSERT`, 연결 reset, LLM 프로세스 종료 위험을 줄입니다.
+전역 `Llama` 객체의 native 상태를 보호하기 위해 생성 호출은 한 번에 하나만 실행합니다. 처리량은 낮아질 수 있지만 동시 호출로 인한 `GGML_ASSERT`, 연결 reset, LLM 프로세스 종료 위험을 줄입니다. backend timeout보다 lock 대기와 생성 시간이 길어지면 provider timeout이 먼저 발생할 수 있으므로 Python 로그와 `HF_LOCAL_TIMEOUT_MS`를 함께 확인해야 합니다.
 
-입력은 system/user prompt와 생성 설정이고, 출력은 이어지는 코드에서 `choices[0].message.content`로 추출됩니다. 모델 형식이 다르거나 choices가 비어 있으면 예외가 나고 로그에 stack trace가 남습니다.
+확인 질문: `choices`가 빈 배열인 경우 구조 검사를 하지 않았다면 어떤 종류의 오류가 어디에서 발생할까요?
 
-확인 질문: backend timeout보다 lock 대기와 생성 시간이 길어지면 사용자는 어떤 오류를 볼 수 있으며 어느 로그부터 확인해야 하나요?
+## 7. 2개 상한 없이 유효 메시지 수 맞추기
+
+원본: [../local-llm/server.py](../local-llm/server.py), multi-plan 정규화 구간
+
+```python
+        msgs = data.get("messages", []) if isinstance(data.get("messages", []), list) else []
+        safe_msgs: List[Dict[str, Any]] = []
+        # 메시지 개수는 고정 상한을 두지 않는다. 각 항목만 개별 검증해
+        # 사람이 여러 말풍선으로 나누어 말하는 계획을 그대로 보존한다.
+        for item in msgs:
+            if not isinstance(item, dict):
+                continue
+            content = str(item.get("content", "")).strip()
+            if not content:
+                continue
+            delay = int(item.get("delayMs", 600))
+            presence = item.get("presenceBeforeSend", "typing")
+            if presence not in {"typing", "thinking", "organizing", "waiting"}:
+                presence = "typing"
+            safe_msgs.append(
+                {
+                    "content": content,
+                    "delayMs": max(0, min(delay, 5000)),
+                    "presenceBeforeSend": presence,
+                }
+            )
+
+        if not safe_msgs:
+            raise ValueError("Model returned a multi_plan without valid messages")
+
+        data["messages"] = safe_msgs
+        data["sendCount"] = len(safe_msgs)
+```
+
+이 반복문은 `msgs[:2]`처럼 배열을 자르지 않습니다. 모델이 4개의 유효한 짧은 메시지를 만들면 4개가 남고, 빈 내용이나 잘못된 항목만 제거됩니다. `delayMs`는 0~5000ms로 제한하고 presence는 허용된 상태로 보정합니다. 항목이 하나도 남지 않으면 실패를 정상 계획처럼 반환하지 않습니다.
+
+원본: [../backend/src/adapters/hfLocalValidation.ts](../backend/src/adapters/hfLocalValidation.ts), `normalizeMultiMessagePlan()` 반환 구간
+
+```ts
+  const messages = obj.messages
+    .map(normalizeMessage)
+    .filter((item): item is OutboundMessageInstruction => Boolean(item));
+  return {
+    sendCount: messages.length,
+    reason: obj.reason,
+    nextState: obj.nextState,
+    messages
+  };
+```
+
+Python 응답을 받은 TypeScript 쪽도 모델이 주장한 `sendCount`를 그대로 믿지 않습니다. 실행할 실제 배열 길이를 다시 사용하므로 queue가 예약할 timer 수와 계획 metadata가 일치합니다. 이 동작은 [../backend/tests/message-plan.test.ts](../backend/tests/message-plan.test.ts)의 3개 메시지 테스트가 보호합니다.
+
+확인 질문: 모델이 `sendCount: 8`과 유효 메시지 3개, 빈 메시지 1개를 반환하면 Python과 TypeScript를 지난 최종 값은 어떻게 되나요?
 
 ## 능동 실습
 
@@ -210,6 +286,8 @@ FastAPI가 여러 요청을 받을 수 있어도 전역 `Llama` 객체의 native
 3. 같은 세션에서 500ms 간격으로 두 메시지가 왔다고 가정하고 sequence 변화를 추적합니다.
 4. proactive 입력에서 `userTyping`, `lastUserMessageAt`, `lastOutreachAt`을 하나씩 바꿔 결과를 예측한 뒤 [../backend/tests/policy.test.ts](../backend/tests/policy.test.ts)의 방식으로 검증합니다.
 5. 원본을 닫고 “저장 후 emit” 순서를 지키는 작은 queue 함수를 다시 작성합니다.
+6. 모델 계획에 유효 메시지 4개와 빈 메시지 1개가 있다고 가정하고 Python과 TypeScript 정규화 뒤의 배열과 `sendCount`를 적습니다.
+7. [../backend/tests/message-plan.test.ts](../backend/tests/message-plan.test.ts)를 읽고 첫 timer 뒤 typing 상태가 바뀌는 순서를 설명합니다.
 
 ## 이해 확인 퀴즈
 
@@ -218,11 +296,12 @@ FastAPI가 여러 요청을 받을 수 있어도 전역 `Llama` 객체의 native
 3. 변형: queue의 DB append가 성공하고 Socket.IO emit이 실패하면 DB와 화면은 각각 어떤 상태인가요?
 4. 오류 찾기: LLM health는 성공하지만 첫 생성 요청이 timeout이라면 확인할 설정과 로그를 순서대로 적으세요.
 5. 독립 수행: reactive와 proactive가 같은 `queuePlanMessages`에 도착하기까지의 서로 다른 호출 경로를 파일명과 함수명으로 작성하세요.
+6. 코드 추적: 4개 메시지 중 두 번째 전송 뒤 사용자가 typing을 시작하면 DB와 화면에 남는 메시지 수를 설명하세요.
 
 해설: [solutions/12-original-code-lab.md](solutions/12-original-code-lab.md)
 
 ## 핵심 요약
 
-삼마고의 핵심은 생성 모델 하나가 아니라 여러 시간 경계입니다. 시작 전 health, HTTP 수락 뒤 계획, 새 입력에 의한 계획 무효화, 전송 직전 typing 확인, native 모델 호출 직렬화를 구분해야 실제 오류를 좁힐 수 있습니다.
+삼마고의 핵심은 생성 모델 하나가 아니라 여러 시간 경계입니다. 시작 전 health, HTTP 수락 뒤 계획, 새 입력에 의한 계획 무효화, 전송 직전 typing 확인, native 모델 호출 직렬화, 다중 메시지 정규화를 구분해야 실제 오류를 좁힐 수 있습니다.
 
 교재 목차로 돌아가기: [README.md](README.md)

@@ -1,3 +1,8 @@
+/**
+ * PostgreSQL pool과 역할별 helper를 공통 Store 계약으로 묶는다.
+ * pool은 인스턴스 수명 동안 공유하며 연결·SQL 오류를 호출자에게 전달한다.
+ */
+
 import type { ConversationSnapshot, MessageRecord, Role } from '@turinglet/shared';
 import { Pool } from 'pg';
 import { listPostgresMessagesForSession, listPostgresProactiveEvents, listPostgresSessions, listPostgresUsers } from './postgresAdmin.js';

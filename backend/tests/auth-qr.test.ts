@@ -1,3 +1,8 @@
+/**
+ * 임시 SQLite DB에서 QR 등록 후 정상·변조 로그인을 검증한다.
+ * 테스트 데이터는 repo 내부 ignore 대상 DB에 만들고 실제 사용자 DB와 분리한다.
+ */
+
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';

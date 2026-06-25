@@ -1,3 +1,8 @@
+/**
+ * SQLite와 PostgreSQL 구현이 공유하는 사용자·세션·Store 계약을 정의한다.
+ * 메서드 변경은 두 DB adapter와 route/runtime 호출부를 함께 수정해야 한다.
+ */
+
 import type { ConversationSnapshot, MessageRecord, Role } from '@turinglet/shared';
 
 export interface UserRecord {

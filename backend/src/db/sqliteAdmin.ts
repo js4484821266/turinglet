@@ -1,3 +1,8 @@
+/**
+ * 관리자 화면에 필요한 SQLite 사용자·세션·메시지·선제 이벤트 조회를 제공한다.
+ * 운영 쓰기 로직과 분리된 읽기 전용 관찰 쿼리 모음이다.
+ */
+
 import type Database from 'better-sqlite3';
 import type { MessageRecord } from '@turinglet/shared';
 import { listSqliteMessages } from './sqliteMessages.js';

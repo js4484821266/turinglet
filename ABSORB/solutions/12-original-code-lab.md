@@ -26,6 +26,12 @@ health 성공은 모델 파일을 로드했다는 뜻이지 모든 생성이 tim
 - reactive: `chatRoutes.registerChatRoutes` → `reactivePlanner.scheduleReactivePlan` → `ConversationOrchestrator.planForUserMessage` → `messageQueue.queuePlanMessages`
 - proactive: `proactiveLoop.runProactiveLoop` → `evaluateProactiveDecision` → `MessageGenerator.inferSilence` → `ConversationOrchestrator.planForSilence` → `messageQueue.queuePlanMessages`
 
+## 6. typing 이후 남는 메시지 수
+
+4개 메시지가 서로 다른 delay로 예약되고 두 번째까지 저장·emit된 뒤 typing이 true가 되었다면, 세 번째와 네 번째 timer는 [../../backend/src/runtime/messageQueue.ts](../../backend/src/runtime/messageQueue.ts)의 전송 직전 검사에서 종료됩니다. DB와 현재 화면에는 앞의 2개만 남습니다.
+
+단, typing 전환과 timer 실행이 같은 시점에 경쟁한다면 실제 순서는 이벤트 루프 실행 순서에 달려 있습니다. 테스트에서는 fake timer로 순서를 명시하고, 운영 디버깅에서는 각 timer의 `delayMs`, typing 갱신 시각, DB `created_at`을 함께 확인해야 합니다.
+
 ## 스스로 채점하기
 
 - 각 답에 파일명과 함수명이 있다: 2점

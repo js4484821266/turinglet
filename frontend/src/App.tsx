@@ -1,3 +1,8 @@
+/**
+ * URL과 인증 상태에 따라 관리자·인증·채팅 화면을 선택한다.
+ * 실제 네트워크와 입력 수명주기는 각 하위 컴포넌트가 담당한다.
+ */
+
 import { AdminPanel } from './components/AdminPanel';
 import { AuthPanel } from './components/AuthPanel';
 import { ChatPanel } from './components/ChatPanel';

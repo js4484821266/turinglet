@@ -1,3 +1,8 @@
+/**
+ * BMP 기반 관리자 로그인과 보호된 관찰 API를 등록한다.
+ * 발급 token은 현재 프로세스 메모리에만 유지되어 재시작 시 무효화된다.
+ */
+
 import crypto from 'node:crypto';
 import type express from 'express';
 import type { Store } from '../db/store.js';

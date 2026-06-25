@@ -1,3 +1,8 @@
+/**
+ * PostgreSQL 사용자·identity token·복구 코드 인증 쿼리를 담당한다.
+ * SQLite 구현과 동일하게 민감한 원본 값 대신 해시를 저장·비교한다.
+ */
+
 import type { Pool } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 import { sha256 } from '../utils/security.js';

@@ -12,7 +12,7 @@ presence는 "생각 중", "정리 중" 같은 상태 신호이고, message는 DB
 
 ## 3. 변형
 
-LLM은 형식이 흔들릴 수 있으므로 `messages: []` 같은 계획을 그대로 실행하면 사용자는 아무 것도 받지 못하거나 queue가 의미 없는 작업을 하게 된다. [../../backend/src/adapters/hfLocalValidation.ts](../../backend/src/adapters/hfLocalValidation.ts) 같은 검증이 필요하다.
+최종 `sendCount`는 3이어야 한다. [../../backend/src/adapters/hfLocalValidation.ts](../../backend/src/adapters/hfLocalValidation.ts)는 모델이 주장한 숫자를 신뢰하지 않고, 빈 문자열과 잘못된 항목을 제거한 실제 `messages.length`를 사용한다. 이렇게 해야 queue가 실행할 항목 수와 계획 metadata가 일치한다.
 
 ## 4. 독립 수행
 

@@ -1,3 +1,8 @@
+/**
+ * SQLite 메시지 저장·조회와 감정 snapshot 갱신·대화 snapshot 조립을 담당한다.
+ * 메시지는 저장 후 MessageRecord로 변환되며 typing 상태를 함께 조회한다.
+ */
+
 import type Database from 'better-sqlite3';
 import type { ConversationSnapshot, MessageRecord, Role } from '@turinglet/shared';
 import { v4 as uuidv4 } from 'uuid';

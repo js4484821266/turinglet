@@ -8,7 +8,7 @@
 
 - 삼마고가 해결하려는 문제가 일반 챗봇과 어떻게 다른지 설명한다.
 - 프론트엔드, 백엔드, DB, 로컬 LLM 서버가 어떤 순서로 연결되는지 추적한다.
-- 사용자의 한 메시지가 저장되고, 반응 계획으로 바뀌고, 지연 전송되는 흐름을 설명한다.
+- 사용자의 한 메시지가 저장되고, 개수 제한 없는 반응 계획으로 바뀌고, 각 지연 전송 시 typing을 다시 확인하는 흐름을 설명한다.
 - 침묵 구간에서 선제 발화가 왜 제한적으로만 실행되는지 설명한다.
 - QR 기반 가입/로그인과 세션 복원의 역할을 설명한다.
 - 작은 정책 변경을 어느 파일에서 해야 하는지 판단한다.
@@ -42,7 +42,7 @@
 | 9 | [09-guided-modifications.md](09-guided-modifications.md) | 작은 기능 변경 실습 |
 | 10 | [10-reimplementation.md](10-reimplementation.md) | 핵심 기능을 빈 파일에서 다시 구현하는 연습 |
 | 11 | [11-explain-it-yourself.md](11-explain-it-yourself.md) | 자기 말로 설명하기와 최종 점검 |
-| 12 | [12-original-code-lab.md](12-original-code-lab.md) | 실제 원본 코드 스니펫으로 실행 흐름 재추적 |
+| 12 | [12-original-code-lab.md](12-original-code-lab.md) | 실제 원본 코드로 실행 흐름, 응답 검증, 다중 메시지 정규화 재추적 |
 
 해설은 [solutions/README.md](solutions/README.md)에서 문서별로 찾아볼 수 있습니다. 퀴즈를 먼저 풀고 해설을 확인하세요.
 

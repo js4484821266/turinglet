@@ -1,3 +1,8 @@
+/**
+ * SQLite 사용자·identity token·복구 코드 인증 쿼리를 담당한다.
+ * 원본 token과 복구 코드는 저장하지 않고 해시 비교에 사용한다.
+ */
+
 import type Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import { sha256 } from '../utils/security.js';

@@ -1,3 +1,8 @@
+/**
+ * 관리자 화면용 PostgreSQL 사용자·세션·메시지·선제 이벤트 조회를 제공한다.
+ * 페이지 표시용 별칭과 숫자 변환을 SQL 결과에 명시한다.
+ */
+
 import type { Pool } from 'pg';
 import type { MessageRecord } from '@turinglet/shared';
 import { listPostgresMessages } from './postgresMessages.js';

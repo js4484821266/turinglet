@@ -55,6 +55,35 @@ Presence는 메시지가 아닙니다. 화면에서 "상대가 내용을 생각 
 
 각 메시지에는 `content`, `delayMs`, `presenceBeforeSend`가 있습니다. 그래서 "무엇을 말할지"와 "언제 보낼지"가 한 계획 안에 함께 들어갑니다.
 
+원본: [../shared/src/index.ts](../shared/src/index.ts), `MultiMessagePlan`
+
+```ts
+export interface MultiMessagePlan {
+  sendCount: number;
+  reason: string;
+  nextState: SessionMachineState;
+  messages: OutboundMessageInstruction[];
+}
+```
+
+`sendCount`가 `number`인 이유는 계획을 0개, 1개, 2개 또는 그보다 많은 말풍선으로 나눌 수 있기 때문입니다. 고정 상한은 없지만, 외부 모델이 잘못된 개수를 적을 수 있으므로 Python과 TypeScript 양쪽에서 각 메시지를 검사합니다.
+
+원본: [../backend/src/adapters/hfLocalValidation.ts](../backend/src/adapters/hfLocalValidation.ts), `normalizeMultiMessagePlan()` 반환 구간
+
+```ts
+  const messages = obj.messages
+    .map(normalizeMessage)
+    .filter((item): item is OutboundMessageInstruction => Boolean(item));
+  return {
+    sendCount: messages.length,
+    reason: obj.reason,
+    nextState: obj.nextState,
+    messages
+  };
+```
+
+예를 들어 모델이 `sendCount: 10`이라고 적었지만 유효한 메시지가 3개뿐이면, 실행 계획은 `sendCount: 3`과 그 3개만 갖습니다. 반대로 유효한 메시지가 5개라면 2개로 자르지 않고 5개를 유지합니다.
+
 ## Reactive와 Proactive
 
 | 구분 | 시작 조건 | 주요 파일 | 예 |
@@ -114,7 +143,7 @@ Python 서버 응답이 잘못되면 [../backend/src/adapters/hfLocalValidation.
 
 1. 기본: presence와 message의 차이를 설명하세요.
 2. 적용: `recentEmotionalIntensity`가 8이고 침묵이 길면 어떤 종류의 proactive 메시지가 선택될 가능성이 있나요?
-3. 변형: LLM이 `messages: []`인 계획을 반환하면 왜 검증이 필요할까요?
+3. 변형: LLM이 `sendCount: 10`과 유효한 메시지 3개를 반환하면 최종 `sendCount`는 무엇이어야 하며, 왜 그런가요?
 4. 독립 수행: `ConversationSnapshot` 없이 매번 최근 메시지 200개를 읽어 판단하는 설계의 단점을 설명하세요.
 
 해설: [solutions/05-core-concepts.md](solutions/05-core-concepts.md)

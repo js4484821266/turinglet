@@ -1,3 +1,8 @@
+/**
+ * 인증 정보, 대화 메시지, presence를 보관하는 Zustand 화면 상태 계약이다.
+ * 서버 영속 데이터의 대체물이 아니며 새로고침 시 API에서 메시지를 다시 읽는다.
+ */
+
 import { create } from 'zustand';
 import type { ChatMessage } from './api';
 

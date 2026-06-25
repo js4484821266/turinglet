@@ -1,3 +1,8 @@
+/**
+ * 단일 메시지 생성과 침묵 의미 해석을 LLM provider 계약으로 감싼다.
+ * 상태를 보관하지 않으며 provider 실패를 대체 문구로 숨기지 않는다.
+ */
+
 import type { ConversationSnapshot, LLMProviderAdapter, MessageRecord, SilenceMeaning } from '@turinglet/shared';
 
 /**

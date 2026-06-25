@@ -1,3 +1,8 @@
+/**
+ * 선제 발화 조건과 입력 중 끼어들기 금지 등 대화 정책을 검증한다.
+ * 외부 LLM 대신 TestProvider를 사용해 시간·상태 분기만 재현한다.
+ */
+
 import { evaluateProactiveDecision } from '@turinglet/scheduler';
 import type { LLMProviderAdapter, MultiMessagePlan, SilenceMeaning } from '@turinglet/shared';
 import { describe, expect, it, vi } from 'vitest';

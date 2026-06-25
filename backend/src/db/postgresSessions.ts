@@ -1,3 +1,8 @@
+/**
+ * PostgreSQL 세션 생성·조회·활성 갱신 쿼리를 담당한다.
+ * SQLite 구현과 같은 Store 의미를 유지해야 provider 교체가 가능하다.
+ */
+
 import type { Pool } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 import type { SessionRecord } from './types.js';

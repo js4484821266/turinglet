@@ -1,3 +1,8 @@
+/**
+ * better-sqlite3 연결과 역할별 helper를 공통 비동기 Store 계약으로 묶는다.
+ * 생성 시 DB 부모 경로를 준비하며 SQL 오류는 호출자에게 전달한다.
+ */
+
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';

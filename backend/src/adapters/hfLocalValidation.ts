@@ -1,3 +1,8 @@
+/**
+ * Python 로컬 LLM의 unknown 응답을 공유 도메인 타입으로 검증·정규화한다.
+ * 잘못된 항목은 실행 계획에 넣지 않으며 유효한 메시지 수를 sendCount의 기준으로 삼는다.
+ */
+
 import type { MultiMessagePlan, OutboundMessageInstruction, PresenceState, SessionMachineState, SilenceMeaning } from '@turinglet/shared';
 
 export function isSilenceMeaning(value: unknown): value is SilenceMeaning {
@@ -30,12 +35,14 @@ function normalizeMessage(item: unknown): OutboundMessageInstruction | undefined
   if (!item || typeof item !== 'object') return undefined;
   const entry = item as { content?: unknown; delayMs?: unknown; presenceBeforeSend?: unknown };
   if (typeof entry.content !== 'string') return undefined;
+  const content = entry.content.trim();
+  if (!content) return undefined;
 
   const delayMs = typeof entry.delayMs === 'number' ? Math.max(0, Math.floor(entry.delayMs)) : 500;
   const presenceBeforeSend = isPresenceState(entry.presenceBeforeSend) ? entry.presenceBeforeSend : undefined;
   return presenceBeforeSend
-    ? { content: entry.content, delayMs, presenceBeforeSend }
-    : { content: entry.content, delayMs };
+    ? { content, delayMs, presenceBeforeSend }
+    : { content, delayMs };
 }
 
 export function normalizeMultiMessagePlan(result: unknown): MultiMessagePlan | undefined {
@@ -54,7 +61,7 @@ export function normalizeMultiMessagePlan(result: unknown): MultiMessagePlan | u
     .map(normalizeMessage)
     .filter((item): item is OutboundMessageInstruction => Boolean(item));
   return {
-    sendCount: Math.max(0, Math.floor(obj.sendCount)),
+    sendCount: messages.length,
     reason: obj.reason,
     nextState: obj.nextState,
     messages
