@@ -27,6 +27,89 @@
 
 원본 소개는 [../README.md](../README.md)를 먼저 훑어보면 좋습니다.
 
+## 전체 코드 구조
+
+아래 그림은 화면 입력이 대화 계획, 로컬 모델, 지연 전송과 저장소를 거쳐 다시 화면으로 돌아오는 전체 구조를 위에서 아래로 보여줍니다. 점선은 공통 타입이나 설정처럼 여러 계층이 함께 참조하는 관계입니다.
+
+```mermaid
+flowchart TB
+    User["사용자 / 브라우저"]
+
+    subgraph Frontend["Frontend · React"]
+        direction TB
+        Main["frontend/src/main.tsx"]
+        App["App.tsx<br/>화면 선택"]
+        Panels["AuthPanel · ChatPanel · AdminPanel"]
+        Store["Zustand store<br/>화면 상태"]
+        Main --> App --> Panels
+        Panels <--> Store
+    end
+
+    subgraph BackendEntry["Backend · 조립과 API"]
+        direction TB
+        Server["backend/src/server.ts<br/>LLM health 확인 후 시작"]
+        Composition["backend/src/app.ts<br/>의존성 조립"]
+        Routes["routes/<br/>auth · chat · admin"]
+        Realtime["runtime/realtime.ts<br/>Socket.IO"]
+        Server --> Composition --> Routes
+        Composition --> Realtime
+    end
+
+    subgraph Conversation["대화 엔진"]
+        direction TB
+        Reactive["runtime/reactivePlanner.ts<br/>사용자 메시지 뒤 잠시 대기"]
+        ProactivePolicy["scheduler/src/index.ts<br/>선제 발화 가능 여부"]
+        Proactive["runtime/proactiveLoop.ts<br/>침묵 세션 주기 검사"]
+        Orchestrator["engine/orchestrator.ts<br/>규칙과 LLM 계획 연결"]
+        Generator["engine/messageGenerator.ts"]
+        Queue["runtime/messageQueue.ts<br/>delay와 전송 직전 typing 검사"]
+        Reactive --> Orchestrator
+        ProactivePolicy --> Proactive --> Generator
+        Proactive --> Orchestrator
+        Orchestrator --> Queue
+    end
+
+    subgraph LocalLLM["로컬 LLM"]
+        direction TB
+        Adapter["adapters/hfLocalProvider.ts<br/>HTTP와 결과 검증"]
+        Python["local-llm/server.py<br/>FastAPI · llama-cpp-python"]
+        Model["로컬 GGUF 모델 파일"]
+        Adapter --> Python --> Model
+    end
+
+    subgraph Persistence["데이터 계층"]
+        direction TB
+        StoreContract["db/types.ts<br/>공통 Store 계약"]
+        Stores["SQLiteStore / PostgresStore"]
+        Schema["database/migrations/001_init.sql"]
+        Database["SQLite 또는 PostgreSQL"]
+        StoreContract --> Stores --> Database
+        Schema --> Database
+    end
+
+    Shared["shared/src/index.ts<br/>공통 타입과 도메인 계약"]
+    Config["backend/src/config.ts · .env"]
+
+    User --> Main
+    Panels -->|REST 요청| Routes
+    Routes -->|사용자 메시지| Reactive
+    Routes --> StoreContract
+    Orchestrator -->|생성 계획 요청| Adapter
+    Generator --> Adapter
+    Queue -->|assistant 메시지 저장| StoreContract
+    Queue -->|실시간 전송| Realtime
+    Realtime -->|message · presence| Panels
+
+    Shared -.-> Frontend
+    Shared -.-> Conversation
+    Shared -.-> ProactivePolicy
+    Config -.-> Server
+    Config -.-> Conversation
+    Config -.-> Adapter
+```
+
+구조를 처음 읽을 때는 세로 중심 경로인 `ChatPanel → chat route → reactivePlanner → orchestrator → local LLM → messageQueue → DB/Socket.IO`를 먼저 따라가세요. 침묵 후 먼저 말 걸기는 `scheduler → proactiveLoop`에서 같은 orchestrator와 queue로 합류합니다.
+
 ## 학습 순서
 
 | 순서 | 문서 | 배우는 내용 |
