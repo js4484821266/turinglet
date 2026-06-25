@@ -15,3 +15,4 @@
 | [../09-guided-modifications.md](../09-guided-modifications.md) | [09-guided-modifications.md](09-guided-modifications.md) |
 | [../10-reimplementation.md](../10-reimplementation.md) | [10-reimplementation.md](10-reimplementation.md) |
 | [../11-explain-it-yourself.md](../11-explain-it-yourself.md) | [11-explain-it-yourself.md](11-explain-it-yourself.md) |
+| [../12-original-code-lab.md](../12-original-code-lab.md) | [12-original-code-lab.md](12-original-code-lab.md) |

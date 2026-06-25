@@ -42,6 +42,7 @@
 | 9 | [09-guided-modifications.md](09-guided-modifications.md) | 작은 기능 변경 실습 |
 | 10 | [10-reimplementation.md](10-reimplementation.md) | 핵심 기능을 빈 파일에서 다시 구현하는 연습 |
 | 11 | [11-explain-it-yourself.md](11-explain-it-yourself.md) | 자기 말로 설명하기와 최종 점검 |
+| 12 | [12-original-code-lab.md](12-original-code-lab.md) | 실제 원본 코드 스니펫으로 실행 흐름 재추적 |
 
 해설은 [solutions/README.md](solutions/README.md)에서 문서별로 찾아볼 수 있습니다. 퀴즈를 먼저 풀고 해설을 확인하세요.
 
@@ -87,3 +88,5 @@
 - 다시 구현할 수 있다: 원본을 닫고 작은 버전을 직접 작성할 수 있다.
 
 다음 문서: [01-problem-and-goals.md](01-problem-and-goals.md)
+
+1~11장을 마친 뒤에는 [12-original-code-lab.md](12-original-code-lab.md)에서 원본 코드와 설명이 실제로 일치하는지 직접 검증하세요.
