@@ -1,8 +1,8 @@
 /**
- * ??? ??? ??? ?? ??? timer ???? ?? ????.
- * HTTP? ?? 202? ???? ? ??? ?? ??? typing? ????.
- * ??? sequence? timer? ??? ??? ??? ??? ???.
- * DB ?? LLM ??? ??? callback? ?? ???? ???? ??.
+ * 사용자 메시지 직후의 반응 계획을 타이머 기반으로 지연 실행한다.
+ * HTTP는 먼저 202를 반환하고 이 모듈은 후속 입력과 입력 중 상태를 관찰한다.
+ * 세션별 순번과 타이머가 오래된 계획의 뒤늦은 전송을 막는다.
+ * DB 또는 LLM 실패는 비동기 콜백의 오류 경계에서 관찰해야 한다.
  */
 
 import type { LLMProviderAdapter, PresenceState } from '@turinglet/shared';
@@ -19,8 +19,10 @@ interface ReactiveDeps {
   queuePlanMessages: QueuePlanMessages;
 }
 
-// Reactive planning is deliberately asynchronous: the HTTP handler can return
-// 202 immediately, while this loop waits for continuation and typing signals.
+/**
+ * 세션별 timer와 sequence를 소유하는 reactive planner를 만든다.
+ * 반환된 scheduler는 사용자 입력 종료를 기다리며 비동기 오류는 HTTP 응답과 분리된다.
+ */
 export function createReactivePlanner(deps: ReactiveDeps) {
   const reactivePlanTimers = new Map<string, NodeJS.Timeout>();
   const reactiveSequence = new Map<string, number>();

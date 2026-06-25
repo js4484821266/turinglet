@@ -8,6 +8,10 @@ export function mapState(userTyping: boolean, intensity: number): SessionMachine
   return 'idle';
 }
 
+/**
+ * DB의 nullable JSON 문자열을 메시지 metadata 객체로 복원한다.
+ * 빈 값이나 손상된 JSON은 metadata가 없다는 뜻의 `undefined`로 처리한다.
+ */
 export function parseMetadata(metadataJson: string | null): Record<string, unknown> | undefined {
   if (!metadataJson) return undefined;
   try {
@@ -17,12 +21,17 @@ export function parseMetadata(metadataJson: string | null): Record<string, unkno
   }
 }
 
-// Runtime commands can start from a workspace package folder. This walk keeps
-// relative SQLite paths anchored to the repository root instead of cwd drift.
+/**
+ * workspace 하위에서 시작해 이름이 `turinglet`인 루트 package를 찾는다.
+ *
+ * @param startDir 탐색을 시작할 디렉터리
+ * @returns 저장소 루트. 찾지 못하면 원래 `startDir`을 반환한다.
+ * @remarks 읽을 수 없는 package.json은 건너뛰며 파일 시스템을 변경하지 않는다.
+ */
 export function findRepoRoot(startDir: string): string {
   let dir = startDir;
 
-  while (true) {
+  for (;;) {
     const pkgPath = path.join(dir, 'package.json');
     if (fs.existsSync(pkgPath)) {
       try {
@@ -39,6 +48,10 @@ export function findRepoRoot(startDir: string): string {
   }
 }
 
+/**
+ * DB 조회 행을 패키지 공통 `MessageRecord`로 변환한다.
+ * epoch millisecond는 ISO 문자열로, metadata JSON 오류는 `undefined`로 바뀐다.
+ */
 export function toMessageRecord(row: {
   id: string;
   sessionId: string;

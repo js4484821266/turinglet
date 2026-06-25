@@ -19,7 +19,7 @@
     "dev:desktop": "concurrently --kill-others --kill-others-on-fail \"npm run dev -w backend\" \"npm run dev -w frontend\" \"npm run dev:electron\"",
     "dev:electron": "cross-env ELECTRON_START_URL=http://localhost:5173 electron frontend/electron/main.mjs",
     "build": "npm run build -w shared && npm run build -w scheduler && npm run build -w database && npm run build -w backend && npm run build -w frontend",
-    "lint": "npm run lint -ws",
+    "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test -w backend",
     "migrate": "npm run migrate -w database",
     "seed": "npm run seed -w database",

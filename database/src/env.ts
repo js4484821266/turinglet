@@ -4,7 +4,7 @@ import path from 'node:path';
 function findRepoRoot(startDir: string): string {
   let dir = startDir;
 
-  while (true) {
+  for (;;) {
     const pkgPath = path.join(dir, 'package.json');
     if (fs.existsSync(pkgPath)) {
       try {
@@ -26,6 +26,10 @@ function findRepoRoot(startDir: string): string {
   }
 }
 
+/**
+ * `SQLITE_PATH`를 저장소 루트 기준 절대 경로로 해석한다.
+ * 환경 변수가 없으면 `./database/local-dev.db`를 사용하며 파일은 생성하지 않는다.
+ */
 export function resolveSqlitePath(): string {
   const envPath = process.env.SQLITE_PATH ?? './database/local-dev.db';
   if (path.isAbsolute(envPath)) return envPath;

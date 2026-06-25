@@ -21,21 +21,25 @@
 작은 단위부터 확인합니다.
 
 1. 파일과 환경 변수 확인
-2. TypeScript build
-3. backend test
-4. DB migration
-5. LLM health
-6. backend health
-7. frontend 화면
-8. 실제 메시지 송수신
+2. lint
+3. TypeScript build
+4. backend test
+5. DB migration
+6. LLM health
+7. backend health
+8. frontend 화면
+9. 실제 메시지 송수신
 
 기본 명령:
 
 ```bash
+npm run lint
 npm run build
 npm run test -w backend
 npm run migrate
 ```
+
+lint는 출력이 비어 있는 상태를 기준으로 합니다. import resolver 같은 설정 오류와 실제 코드 오류를 구분하며, 경고를 비활성화해 통과시키는 방식은 사용하지 않습니다.
 
 LLM 서버가 준비된 경우:
 

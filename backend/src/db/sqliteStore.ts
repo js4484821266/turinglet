@@ -11,6 +11,10 @@ import { getLastSqliteProactiveEventAt, isSqliteUserTyping, recordSqliteProactiv
 import { createSqliteSession, getLatestSqliteSessionByUserId, getSqliteSessionById, listSqliteActiveSessions, touchSqliteSession } from './sqliteSessions.js';
 import type { SessionRecord, Store, UserRecord } from './types.js';
 
+/**
+ * better-sqlite3 연결을 공통 비동기 `Store` 계약으로 노출한다.
+ * 생성 시 경로와 부모 디렉터리를 준비하고 SQL은 역할별 helper에 위임한다.
+ */
 export class SqliteStore implements Store {
   private readonly db: Database.Database;
 

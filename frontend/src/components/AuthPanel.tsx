@@ -5,6 +5,10 @@ import { useAppStore } from '../store';
 
 // Authentication is intentionally QR-first: the screen teaches the code path
 // that the backend also relies on, instead of hiding login behind test data.
+/**
+ * QR 등록·로그인·복구 입력을 처리하고 성공한 세션을 전역 store에 기록한다.
+ * 네트워크 또는 QR 파싱 실패는 화면 오류 상태로 표시한다.
+ */
 export function AuthPanel() {
   const setAuth = useAppStore((s) => s.setAuth);
   const setRegistration = useAppStore((s) => s.setRegistration);

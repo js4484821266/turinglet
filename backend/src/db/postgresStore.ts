@@ -7,6 +7,10 @@ import { getLastPostgresProactiveEventAt, isPostgresUserTyping, recordPostgresPr
 import { createPostgresSession, getLatestPostgresSessionByUserId, getPostgresSessionById, listPostgresActiveSessions, touchPostgresSession } from './postgresSessions.js';
 import type { SessionRecord, Store, UserRecord } from './types.js';
 
+/**
+ * PostgreSQL connection pool을 공통 `Store` 계약으로 감싼 adapter다.
+ * pool은 인스턴스 수명 동안 공유하며 연결·SQL 오류를 호출자에게 전달한다.
+ */
 export class PostgresStore implements Store {
   private readonly pool: Pool;
 

@@ -1,8 +1,8 @@
 /**
- * Express app? ?? ????.
- * DB, LLM adapter, ?? ???, ?? queue? route? ????.
- * app ??? port listen? ??? ???? ?? ??? ?? ?? ??.
- * ??, ??? key, production frontend build ??? ?? ? ??? ??.
+ * Express 애플리케이션의 조립 지점이다.
+ * DB, LLM 어댑터, 반응 계획기, 전송 대기열과 경로를 연결한다.
+ * 애플리케이션 생성과 포트 수신을 분리해 테스트가 실제 서버를 열지 않게 한다.
+ * 설정, 관리자 키, 운영용 프론트엔드 빌드 문제는 생성 중 예외가 된다.
  */
 
 import fs from 'node:fs';
@@ -37,8 +37,14 @@ export interface AppServices {
 
 export { attachSocket };
 
-// createApp is now the composition root: it wires dependencies together while
-// keeping route behavior, timers, and realtime details in smaller files.
+/**
+ * 애플리케이션의 장기 생명주기를 담당하는 서비스를 조립한다.
+ *
+ * @param options 테스트에서 현재 실행용 관리자 BMP를 주입할 때 사용한다.
+ * @returns Express app, scheduler 시작 함수, Socket.IO 결합 함수를 반환한다.
+ * @throws DB 설정이 잘못되었거나 운영용 frontend build가 없으면 예외가 발생한다.
+ * @remarks 포트를 열지는 않지만 기본 호출에서는 관리자 BMP 파일을 생성한다.
+ */
 export function createApp(options: CreateAppOptions = {}): AppServices {
   const app = express();
   let io: SocketLike | undefined;
@@ -107,7 +113,9 @@ export function createApp(options: CreateAppOptions = {}): AppServices {
     });
   }
 
-  app.use((err: unknown, _req: Request, res: Response, _next: express.NextFunction) => {
+  app.use((err: unknown, _req: Request, res: Response, next: express.NextFunction) => {
+    // Express는 인자가 네 개인 함수를 오류 middleware로 판별하므로 next를 생략할 수 없다.
+    void next;
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   });

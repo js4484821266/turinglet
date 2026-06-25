@@ -1,8 +1,8 @@
 /**
- * ?? ??? ????? ??? ?? ?? ??? ????.
- * timing ??, ?? ??, ?? ??, ?? queue? ???? ????.
- * ? ??? DB ?? LLM ??? ??? ?? ?? ??? ????.
- * ?? ???? 5?? ??? ?? ??? context ??? ???.
+ * 활성 세션을 주기적으로 확인해 선제 발화 후보를 처리한다.
+ * 시점 정책, 침묵 해석, 문장 계획, 전송 대기열을 순서대로 연결한다.
+ * 한 세션의 DB 또는 LLM 실패는 격리해 다른 세션 검사를 계속한다.
+ * 최근 메시지는 5개로 제한해 작은 모델의 문맥 길이 초과를 줄인다.
  */
 
 import { evaluateProactiveDecision } from '@turinglet/scheduler';
@@ -19,8 +19,10 @@ interface ProactiveDeps {
   queuePlanMessages: QueuePlanMessages;
 }
 
-// The proactive loop is separate from HTTP routes because it is a background
-// observer: it scans active sessions and only speaks when timing rules allow.
+/**
+ * 활성 세션을 독립적으로 검사하는 proactive loop와 시작 함수를 만든다.
+ * 같은 인스턴스는 interval 하나만 유지하고 세션별 실패를 격리한다.
+ */
 export function createProactiveScheduler(deps: ProactiveDeps) {
   let interval: NodeJS.Timeout | undefined;
 

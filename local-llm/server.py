@@ -1,8 +1,8 @@
-"""?? GGUF ??? ???? task API? ????.
+"""로컬 GGUF 모델을 백엔드용 작업 API로 노출한다.
 
-??? repo? .env? /v1/generate JSON?? ??? task? result envelope?.
-HF_MODEL_PATH? ??? ??? ?? ??? ?? ??? ????.
-?? Llama ????? native ??? ???? ?? ?? ??? ?????.
+입력은 저장소의 .env와 /v1/generate JSON이고 출력은 작업별 결과 봉투다.
+HF_MODEL_PATH가 없거나 모델을 읽지 못하면 시작 자체가 실패한다.
+단일 Llama 인스턴스의 네이티브 상태를 보호하기 위해 생성 호출을 직렬화한다.
 """
 
 from __future__ import annotations
@@ -77,11 +77,15 @@ TaskType = Literal["single_message", "multi_plan", "summary", "silence_meaning"]
 
 
 class GenerateRequest(BaseModel):
+    """백엔드가 요청한 작업 이름과 작업별 JSON payload를 검증한다."""
+
     task: TaskType
     payload: Dict[str, Any]
 
 
 class GenerateResponse(BaseModel):
+    """성공 결과 또는 실패 원인을 동일한 HTTP 응답 형태로 전달한다."""
+
     ok: bool
     result: Any | None = None
     error: Optional[str] = None
@@ -99,6 +103,7 @@ CONTEXT_SIZE = _int_env("HF_CONTEXT_SIZE", 4096, 512)
 
 
 def _validate_local_model_file(local_path: Path) -> None:
+    """경로가 비어 있지 않은 GGUF 일반 파일인지 검사한다."""
     if not local_path.exists():
         raise FileNotFoundError(f"model file does not exist: {local_path}")
     if not local_path.is_file():
@@ -112,6 +117,7 @@ def _validate_local_model_file(local_path: Path) -> None:
 
 
 def _resolve_model_path() -> Path:
+    """HF_MODEL_PATH를 repo 기준으로 해석하고 유효한 절대 경로를 반환한다."""
     if not MODEL_PATH:
         raise RuntimeError(
             "No local model file configured. Set HF_MODEL_PATH to an existing GGUF file. "

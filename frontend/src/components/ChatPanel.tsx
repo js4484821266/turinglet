@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import axios from 'axios';
+import { isAxiosError } from 'axios';
 import { io } from 'socket.io-client';
 import { api, backendOrigin, type ChatMessage } from '../api';
 import { useAppStore } from '../store';
 import { formatTimestamp } from '../utils/time';
 
-// ChatPanel owns the live conversation loop: REST sends user intent, while
-// Socket.IO receives delayed assistant messages and presence updates.
+/**
+ * 인증된 세션의 실시간 대화 화면과 입력 수명주기를 관리한다.
+ * 사용자 의도는 REST로 보내고 지연된 메시지와 presence는 Socket.IO로 받는다.
+ */
 export function ChatPanel() {
   const sessionId = useAppStore((s) => s.sessionId);
   const messages = useAppStore((s) => s.messages);
@@ -79,7 +81,7 @@ export function ChatPanel() {
       await api.post('/chat/messages', { content }, { headers: { 'x-session-id': sessionId } });
     } catch (error: unknown) {
       let message = '전송 실패: 잠시 후 다시 시도해주세요.';
-      if (axios.isAxiosError(error)) {
+      if (isAxiosError(error)) {
         const status = error.response?.status;
         if (status === 429) message = '전송 실패: 요청이 너무 많아요(429). 2~3초 후 다시 보내주세요.';
         else if (status === 401) message = '전송 실패: 세션이 만료되었습니다. 다시 로그인해주세요.';

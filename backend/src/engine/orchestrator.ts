@@ -1,7 +1,7 @@
 /**
- * ??? ???? ??? MultiMessagePlan?? ??? ?? ?? ????.
- * ???? ? ?? ??? ??? ?? ?? ?? ??? LLM? ????.
- * provider ??? fallback ??? ??? ?? ????? ????.
+ * 사용자 메시지와 침묵을 MultiMessagePlan으로 바꾸는 대화 정책 계층이다.
+ * 끼어들면 안 되는 조건은 코드로 먼저 막고 문장 생성만 LLM에 위임한다.
+ * 제공자 오류는 대체 문구로 숨기지 않고 호출자에게 전달한다.
  */
 
 import type { ConversationSnapshot, LLMProviderAdapter, MultiMessagePlan } from '@turinglet/shared';
@@ -28,8 +28,13 @@ function likelyUserWillContinue(text: string): boolean {
 }
 
 export class ConversationOrchestrator {
+  /** @param provider 규칙으로 결정할 수 없는 메시지 계획을 생성할 LLM provider */
   constructor(private readonly provider: LLMProviderAdapter) {}
 
+  /**
+   * 사용자 입력 중 여부와 문장 완결성을 검사한 뒤 reactive 계획을 반환한다.
+   * 보류 조건이 아니면 provider 예외를 그대로 전달한다.
+   */
   async planForUserMessage(input: {
     snapshot: ConversationSnapshot;
     userText: string;
@@ -56,6 +61,10 @@ export class ConversationOrchestrator {
     });
   }
 
+  /**
+   * 침묵 상황을 부담이 낮은 proactive 계획으로 변환한다.
+   * 현재 구현은 typing과 감정 강도 7을 분기 기준으로 사용한다.
+   */
   async planForSilence(input: { snapshot: ConversationSnapshot }): Promise<MultiMessagePlan> {
     if (input.snapshot.userTyping) {
       return {

@@ -1,8 +1,8 @@
 /**
- * ??? assistant ???? ?? ? ???? Socket.IO? ????.
- * ??? ?? timer? ??? ?? ??? ???.
- * ?? ?? ?? typing ??? ?? ??? ??? ????? ???.
- * timer callback? DB ??? ?? HTTP ??? ???? ??.
+ * 계획된 assistant 메시지를 지연 뒤 저장하고 Socket.IO로 전송한다.
+ * 세션별 기존 타이머를 취소해 계획 중복을 막는다.
+ * 실제 전송 직전 입력 중 상태를 다시 확인해 뒤늦은 끼어들기를 줄인다.
+ * 타이머 콜백의 DB 실패는 상위 HTTP 요청과 분리되어 있다.
  */
 
 import type { MessageRecord, PresenceState } from '@turinglet/shared';
@@ -20,8 +20,10 @@ interface QueueDeps {
   emitMessage: (message: MessageRecord) => void;
 }
 
-// A plan can contain multiple short messages. This queue owns the timers and
-// performs the last typing check immediately before each assistant message.
+/**
+ * 세션별 전송 timer를 소유하는 메시지 queue를 만든다.
+ * 새 계획은 이전 timer를 취소하고 저장 성공 후 실시간 이벤트를 발생시킨다.
+ */
 export function createMessageQueue(deps: QueueDeps) {
   const sessionTimers = new Map<string, NodeJS.Timeout[]>();
 

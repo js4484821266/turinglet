@@ -29,6 +29,10 @@ function readFileAsBase64(file: File): Promise<string> {
 
 // The admin panel is a local observability surface for the prototype. It shows
 // whether sessions, messages, and proactive outreach records are being created.
+/**
+ * 현재 실행에서 생성된 관리자 BMP 인증과 관리 데이터 조회 화면을 제공한다.
+ * 인증 token은 sessionStorage에만 유지되며 탭 수명을 넘겨 보존하지 않는다.
+ */
 export function AdminPanel() {
   const [token, setToken] = useState(() => sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? '');
   const [adminBitmap, setAdminBitmap] = useState<File | undefined>();
